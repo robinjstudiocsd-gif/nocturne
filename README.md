@@ -5,12 +5,12 @@ App iOS de suivi du sommeil, centrée sur l'enregistrement et la réécoute des 
 ## Où en est le projet
 
 - **Étude** : validée le 22 novembre 2026.
-- **Maquettes** : en cours.
-- **Code** : phase 0, une app de test qui vérifie sur un iPhone SE (2e génération) sous iOS 18 les sept points dont dépend le projet.
+- **Maquettes** : en cours, groupe d'écrans par groupe d'écrans.
+- **Code** : lot 0, les fondations. Tous les essais sur l'iPhone se feront à la fin du développement.
 
-## Compilation
+## Compilation et tests
 
-Il n'y a pas de Mac : chaque envoi sur `main` lance la compilation sur un Mac de GitHub (`.github/workflows/build.yml`). Le fichier `Nocturne.ipa` est publié dans la version « phase0 » du dépôt.
+Il n'y a pas de Mac : chaque envoi sur `main` lance, sur un Mac de GitHub, les tests des modules puis la compilation de l'app (`.github/workflows/build.yml`). Le fichier `Nocturne.ipa` est publié dans la version « developpement » du dépôt.
 
 ## Installation
 
@@ -18,7 +18,4 @@ Voir [Docs/INSTALLATION-WINDOWS.md](Docs/INSTALLATION-WINDOWS.md).
 
 ## Organisation
 
-- `project.yml` : description du projet Xcode, lue par XcodeGen.
-- `App/` : l'app.
-- `Extensions/NocturneWidgets/` : le widget et la Live Activity.
-- `Shared/` : le code commun à l'app et à l'extension.
+Voir [Docs/ARCHITECTURE.md](Docs/ARCHITECTURE.md).

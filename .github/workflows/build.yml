@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   ipa:
-    name: App à installer (.ipa)
+    name: Tests et app à installer (.ipa)
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
@@ -26,6 +26,15 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+
+      - name: Tests des modules
+        run: |
+          set -euo pipefail
+          for package in SleepDomain Persistence AppSettings; do
+            echo "::group::Tests de $package"
+            swift test --package-path "Packages/$package"
+            echo "::endgroup::"
+          done
 
       - name: Installer XcodeGen
         run: brew install xcodegen
@@ -58,7 +67,6 @@ jobs:
           # qui re-signe ensuite l'app avec ton identifiant Apple.
           codesign --force --sign - --timestamp=none "$APP/PlugIns/NocturneWidgets.appex"
           codesign --force --sign - --timestamp=none --entitlements App/Nocturne.entitlements "$APP"
-          codesign -d --entitlements - "$APP" || true
           rm -rf Payload Nocturne.ipa
           mkdir Payload
           cp -R "$APP" Payload/
@@ -72,20 +80,21 @@ jobs:
           path: Nocturne.ipa
           retention-days: 30
 
-      - name: Publier le fichier .ipa
+      - name: Publier la version de développement
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh release delete phase0 --cleanup-tag --yes || true
-          gh release create phase0 Nocturne.ipa \
+          gh release delete developpement --cleanup-tag --yes || true
+          gh release create developpement Nocturne.ipa \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Phase 0 · compilation ${{ github.run_number }}" \
-            --notes "App de test de la phase 0, à installer avec Sideloadly. Guide : Docs/INSTALLATION-WINDOWS.md"
+            --title "Version de développement · compilation ${{ github.run_number }}" \
+            --notes "Version en cours de développement, pas encore essayée sur l'iPhone. Guide : Docs/INSTALLATION-WINDOWS.md"
           {
-            echo "### App prête"
+            echo "### Version de développement prête"
             echo ""
-            echo "Télécharger : https://github.com/${{ github.repository }}/releases/download/phase0/Nocturne.ipa"
+            echo "Télécharger : https://github.com/${{ github.repository }}/releases/download/developpement/Nocturne.ipa"
           } >> "$GITHUB_STEP_SUMMARY"
