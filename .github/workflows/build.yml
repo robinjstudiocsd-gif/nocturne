@@ -28,8 +28,6 @@ jobs:
           xcode-version: latest-stable
 
       - name: Tests des modules
-        env:
-          SWIFT_BACKTRACE: enable=yes,interactive=no,color=no
         run: |
           set -euo pipefail
           for package in SleepDomain Persistence AppSettings; do
