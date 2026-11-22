@@ -12,6 +12,8 @@ public struct SleepSession: Identifiable, Hashable, Codable, Sendable {
     public var analysisVersion: Int?
     public var comment: String?
     public var feeling: WakeFeeling?
+    /// Réveils pendant la nuit, détectés ou saisis.
+    public var wakeEpisodes: [WakeEpisode]
     public var createdAt: Date
 
     public init(
@@ -25,6 +27,7 @@ public struct SleepSession: Identifiable, Hashable, Codable, Sendable {
         analysisVersion: Int? = nil,
         comment: String? = nil,
         feeling: WakeFeeling? = nil,
+        wakeEpisodes: [WakeEpisode] = [],
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -37,6 +40,7 @@ public struct SleepSession: Identifiable, Hashable, Codable, Sendable {
         self.analysisVersion = analysisVersion
         self.comment = comment
         self.feeling = feeling
+        self.wakeEpisodes = wakeEpisodes
         self.createdAt = createdAt
     }
 
@@ -63,6 +67,26 @@ public struct SleepSession: Identifiable, Hashable, Codable, Sendable {
     /// Fenêtre de sommeil, de l'endormissement au réveil. Les éveils sont retirés par l'analyse.
     public var sleepWindow: TimeInterval? {
         interval(from: times.sleepOnset, to: times.wake)
+    }
+
+    /// Nombre de réveils de plus de 5 minutes.
+    public var significantWakeCount: Int {
+        wakeEpisodes.filter(\.isSignificant).count
+    }
+
+    /// Temps éveillé pendant la fenêtre de sommeil, d'après les réveils connus.
+    public var wakeDuration: TimeInterval {
+        guard let onset = times.sleepOnset, let wake = times.wake, wake > onset else { return 0 }
+        return wakeEpisodes.reduce(0) { total, episode in
+            let start = max(episode.start, onset)
+            let end = min(episode.end, wake)
+            return total + max(0, end.timeIntervalSince(start))
+        }
+    }
+
+    /// Durée de sommeil : la fenêtre de sommeil moins les réveils connus.
+    public var asleepDuration: TimeInterval? {
+        sleepWindow.map { max(0, $0 - wakeDuration) }
     }
 
     /// Problèmes de cohérence des horaires retenus.
