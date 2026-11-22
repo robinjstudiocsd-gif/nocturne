@@ -1,0 +1,84 @@
+name: Nocturne
+
+options:
+  bundleIdPrefix: io.github.robinjstudiocsd-gif
+  deploymentTarget:
+    iOS: "18.0"
+  developmentLanguage: fr
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_PREVIEWS: NO
+
+targets:
+  Nocturne:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Shared
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Nocturne
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - audio
+        UIUserInterfaceStyle: Dark
+        NSMicrophoneUsageDescription: Nocturne écoute la chambre pendant la nuit pour enregistrer les sons de ton sommeil. Tout reste sur ton iPhone.
+        NSHealthShareUsageDescription: Nocturne lit les nuits enregistrées par ton Apple Watch dans Santé pour les afficher avec les sons de la nuit.
+        NSSupportsLiveActivities: true
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: App/Nocturne.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.robinjstudiocsd-gif.nocturne
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: NocturneWidgets
+
+  NocturneWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/NocturneWidgets
+      - path: Shared
+    info:
+      path: Extensions/NocturneWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Nocturne
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.robinjstudiocsd-gif.nocturne.widgets
+
+schemes:
+  Nocturne:
+    build:
+      targets:
+        Nocturne: all
+    run:
+      config: Debug
+    archive:
+      config: Release
