@@ -30,6 +30,10 @@ public struct SegmentLayout: Sendable {
         relativeFolder + "/niveaux.ncls"
     }
 
+    public var relativeMotionPath: String {
+        relativeFolder + "/mouvements.ncms"
+    }
+
     /// Vrai quand la tranche en cours a atteint sa durée.
     public static func needsRotation(segmentStart: Date, now: Date, duration: TimeInterval = segmentDuration) -> Bool {
         now.timeIntervalSince(segmentStart) >= duration

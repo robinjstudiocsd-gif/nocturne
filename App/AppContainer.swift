@@ -1,5 +1,6 @@
 import AppSettings
 import Foundation
+import NightRecording
 import Persistence
 import SettingsFeature
 import SleepDomain
@@ -10,14 +11,25 @@ import SwiftData
 final class AppContainer {
     let modelContainer: ModelContainer
     let sessions: any SleepSessionRepository
+    let recordings: any RecordingRepository
+    let eveningLogs: any EveningLogRepository
+    let lifecycle: SessionLifecycle
+    let night: NightSessionController
     let journal: any DiagnosticJournal
     let preferences: AppPreferences
     let signing: SigningStatus
     let renewals: RenewalTracker
 
-    init(modelContainer: ModelContainer, journal: any DiagnosticJournal, defaults: UserDefaults, bundleURL: URL) {
+    init(modelContainer: ModelContainer, journal: any DiagnosticJournal, defaults: UserDefaults, bundleURL: URL, storage: RecordingStorage) {
+        let sessions = SwiftDataSleepSessionRepository(container: modelContainer)
+        let recordings = SwiftDataRecordingRepository(container: modelContainer)
+        let lifecycle = SessionLifecycle(repository: sessions)
         self.modelContainer = modelContainer
-        self.sessions = SwiftDataSleepSessionRepository(container: modelContainer)
+        self.sessions = sessions
+        self.recordings = recordings
+        self.eveningLogs = SwiftDataEveningLogRepository(container: modelContainer)
+        self.lifecycle = lifecycle
+        self.night = NightSessionController(lifecycle: lifecycle, recordings: recordings, storage: storage, journal: journal, quality: .standard)
         self.journal = journal
         self.preferences = AppPreferences(defaults: defaults)
         self.signing = SigningStatus.read(bundleURL: bundleURL)
@@ -31,7 +43,8 @@ final class AppContainer {
             modelContainer: try PersistenceStack.makeContainer(),
             journal: journal,
             defaults: .standard,
-            bundleURL: Bundle.main.bundleURL
+            bundleURL: Bundle.main.bundleURL,
+            storage: try RecordingStorage.applicationSupport()
         )
         container.recordLaunch()
         return container

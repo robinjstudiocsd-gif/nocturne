@@ -1,6 +1,9 @@
 import ActivityKit
+import SleepDomain
 import SwiftUI
 import WidgetKit
+
+extension NightActivityAttributes: @retroactive ActivityAttributes {}
 
 /// Live Activity affichée sur l'écran verrouillé pendant la nuit.
 struct NightLiveActivity: Widget {
@@ -21,7 +24,7 @@ struct NightLiveActivity: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.state.isRinging ? "Réveil en cours" : "Écoute en cours")
+                    Text(LockScreenNightView.statusText(context.state))
                 }
             } compactLeading: {
                 Image(systemName: "moon.fill")
@@ -30,7 +33,7 @@ struct NightLiveActivity: Widget {
                 if let alarm = context.state.alarmDate {
                     Text(alarm, style: .time)
                 } else {
-                    Image(systemName: "waveform")
+                    Image(systemName: context.state.isListening ? "waveform" : "moon.zzz")
                 }
             } minimal: {
                 Image(systemName: "moon.fill")
@@ -44,16 +47,22 @@ struct LockScreenNightView: View {
     let attributes: NightActivityAttributes
     let state: NightActivityAttributes.ContentState
 
+    static func statusText(_ state: NightActivityAttributes.ContentState) -> String {
+        if state.isRinging { return "Réveil en cours" }
+        return state.isListening ? "Écoute en cours" : "Nuit en cours, sans écoute"
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: state.isRinging ? "alarm.fill" : "moon.fill")
                 .font(.title2)
                 .foregroundStyle(state.isRinging ? WidgetPalette.amber : WidgetPalette.lavender)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(state.isRinging ? "Réveil en cours" : "Nuit en cours")
+                Text(attributes.kind == .nap ? "Sieste en cours" : "Nuit en cours")
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text("Écoute depuis \(attributes.startDate.formatted(date: .omitted, time: .shortened))")
+                Text("\(LockScreenNightView.statusText(state)) depuis \(attributes.startDate.formatted(date: .omitted, time: .shortened))")
                     .font(.subheadline)
                     .foregroundStyle(WidgetPalette.secondary)
             }

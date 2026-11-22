@@ -30,6 +30,11 @@ public struct LevelMeter: Sendable {
         self.second = startingSecond
     }
 
+    /// Rang de la seconde en cours de mesure.
+    public var currentSecond: Int {
+        second
+    }
+
     /// Niveau d'un bloc d'échantillons, en dBFS.
     public static func decibels(rms: Double) -> Float {
         rms > 0.000_001 ? Float(20 * log10(rms)) : silence

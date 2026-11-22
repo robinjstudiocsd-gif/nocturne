@@ -56,6 +56,8 @@ public enum RecoveryPlanner {
 
     public static func plan(checkpoint: Checkpoint?, running: SleepSession?, now: Date) -> RecoveryAction {
         guard let running, running.state == .running else { return .nothing }
+        // Sans écoute, iOS met l'app en pause la nuit : il n'y a rien à reprendre.
+        guard running.recordingMode != .off else { return .nothing }
         let lastBeat = checkpoint.map { $0.sessionID == running.id ? $0.lastBeat : running.referenceDate } ?? running.referenceDate
         let gap = RecordingGap(sessionID: running.id, start: lastBeat, end: now, cause: .appTerminated)
         if now.timeIntervalSince(lastBeat) > maximumResumeDelay {

@@ -54,6 +54,17 @@ struct Lot1Tests {
         #expect(try await lifecycle.running() == nil)
     }
 
+    @Test("Une nuit interrompue se termine à la dernière minute connue")
+    func closeInterrupted() async throws {
+        let lifecycle = SessionLifecycle(repository: InMemorySleepSessionRepository(), now: { date(22, 23, 0) })
+        let session = try await lifecycle.start(kind: .night, mode: .continuous)
+
+        let closed = try await lifecycle.close(id: session.id, at: date(23, 2, 14))
+        #expect(closed.state == .interrupted)
+        #expect(closed.detected.wake == date(23, 2, 14))
+        #expect(try await lifecycle.running() == nil)
+    }
+
     @Test("Arrêter une session déjà terminée est refusé")
     func stopTwice() async throws {
         let lifecycle = SessionLifecycle(repository: InMemorySleepSessionRepository(), now: { date(22, 23, 0) })

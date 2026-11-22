@@ -72,6 +72,9 @@ struct RootView: View {
                 }
             }
         }
+        .task {
+            await container.night.recoverIfNeeded()
+        }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active: container.journal.record("App au premier plan")

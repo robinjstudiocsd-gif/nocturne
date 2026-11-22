@@ -54,6 +54,18 @@ public struct SessionLifecycle: Sendable {
         return session
     }
 
+    /// Termine une nuit interrompue (app fermée trop longtemps) à la dernière minute connue.
+    @discardableResult
+    public func close(id: UUID, at end: Date) async throws -> SleepSession {
+        guard var session = try await repository.session(id: id) else { throw SessionError.notFound }
+        guard session.state == .running else { throw SessionError.notRunning }
+        session.detected.wake = end
+        session.detected.getUp = end
+        session.state = .interrupted
+        try await repository.save(session)
+        return session
+    }
+
     /// Enregistre une nuit ou une sieste saisie à la main, après vérification des horaires.
     @discardableResult
     public func addManual(kind: SessionKind, times: SessionTimes, comment: String?) async throws -> SleepSession {

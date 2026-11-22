@@ -32,6 +32,11 @@ public final class SegmentWriter {
         try FileManager.default.createDirectory(at: root.appendingPathComponent(layout.relativeFolder, isDirectory: true), withIntermediateDirectories: true)
     }
 
+    /// Rang de la prochaine tranche, pour le point de reprise.
+    public var nextSegmentIndex: Int {
+        nextIndex
+    }
+
     /// Ajoute un bloc d'audio au format `processingFormat`.
     /// Renvoie la tranche qui vient de se terminer, s'il y en a une.
     @discardableResult
