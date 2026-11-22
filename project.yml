@@ -36,6 +36,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: true
         UIBackgroundModes:
           - audio
         UIUserInterfaceStyle: Dark
