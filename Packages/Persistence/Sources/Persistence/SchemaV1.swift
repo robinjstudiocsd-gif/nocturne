@@ -9,7 +9,7 @@ public enum SchemaV1: VersionedSchema {
     public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
     public static var models: [any PersistentModel.Type] {
-        [SleepSessionRecord.self, EveningLogRecord.self]
+        [SleepSessionRecord.self, EveningLogRecord.self, AudioSegmentRecord.self, RecordingGapRecord.self]
     }
 
     /// Une nuit ou une sieste, telle qu'elle est rangée dans la base.
@@ -90,10 +90,56 @@ public enum SchemaV1: VersionedSchema {
             note = log.note
         }
     }
+
+    /// Une tranche d'audio continu.
+    @Model
+    public final class AudioSegmentRecord {
+        @Attribute(.unique) public var id: UUID
+        public var sessionID: UUID
+        public var index: Int
+        public var start: Date
+        public var duration: Double
+        public var relativePath: String
+        public var byteSize: Int64
+        public var qualityRaw: String
+        public var stateRaw: String
+
+        public init(segment: AudioSegment) {
+            id = segment.id
+            sessionID = segment.sessionID
+            index = segment.index
+            start = segment.start
+            duration = segment.duration
+            relativePath = segment.relativePath
+            byteSize = segment.byteSize
+            qualityRaw = segment.quality.rawValue
+            stateRaw = segment.state.rawValue
+        }
+    }
+
+    /// Un trou dans l'enregistrement.
+    @Model
+    public final class RecordingGapRecord {
+        @Attribute(.unique) public var id: UUID
+        public var sessionID: UUID
+        public var start: Date
+        public var end: Date
+        public var causeRaw: String
+
+        public init(gap: RecordingGap) {
+            id = gap.id
+            sessionID = gap.sessionID
+            start = gap.start
+            end = gap.end
+            causeRaw = gap.cause.rawValue
+        }
+    }
 }
 
 public typealias SleepSessionRecord = SchemaV1.SleepSessionRecord
 public typealias EveningLogRecord = SchemaV1.EveningLogRecord
+public typealias AudioSegmentRecord = SchemaV1.AudioSegmentRecord
+public typealias RecordingGapRecord = SchemaV1.RecordingGapRecord
 
 extension SchemaV1.SleepSessionRecord {
     /// La session du domaine correspondant à cet enregistrement.
@@ -186,5 +232,45 @@ public enum NocturneMigrationPlan: SchemaMigrationPlan {
 
     public static var stages: [MigrationStage] {
         []
+    }
+}
+
+extension SchemaV1.AudioSegmentRecord {
+    var segment: AudioSegment {
+        AudioSegment(
+            id: id,
+            sessionID: sessionID,
+            index: index,
+            start: start,
+            duration: duration,
+            relativePath: relativePath,
+            byteSize: byteSize,
+            quality: AudioQuality(rawValue: qualityRaw) ?? .standard,
+            state: AudioSegment.State(rawValue: stateRaw) ?? .truncated
+        )
+    }
+
+    func apply(_ segment: AudioSegment) {
+        sessionID = segment.sessionID
+        index = segment.index
+        start = segment.start
+        duration = segment.duration
+        relativePath = segment.relativePath
+        byteSize = segment.byteSize
+        qualityRaw = segment.quality.rawValue
+        stateRaw = segment.state.rawValue
+    }
+}
+
+extension SchemaV1.RecordingGapRecord {
+    var gap: RecordingGap {
+        RecordingGap(id: id, sessionID: sessionID, start: start, end: end, cause: RecordingGap.Cause(rawValue: causeRaw) ?? .unknown)
+    }
+
+    func apply(_ gap: RecordingGap) {
+        sessionID = gap.sessionID
+        start = gap.start
+        end = gap.end
+        causeRaw = gap.cause.rawValue
     }
 }

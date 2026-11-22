@@ -28,6 +28,8 @@ packages:
     path: Packages/DesignSystem
   Features:
     path: Packages/Features
+  NightRecording:
+    path: Packages/NightRecording
 
 targets:
   Nocturne:
@@ -70,6 +72,7 @@ targets:
       - package: Persistence
       - package: AppSettings
       - package: DesignSystem
+      - package: NightRecording
       - package: Features
         product: DashboardFeature
       - package: Features
