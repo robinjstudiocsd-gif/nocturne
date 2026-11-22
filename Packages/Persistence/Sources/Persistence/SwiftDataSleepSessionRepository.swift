@@ -5,9 +5,12 @@ import SwiftData
 /// Dépôt des sessions sur SwiftData. Il tourne sur le fil principal, comme le contexte de la base.
 @MainActor
 public final class SwiftDataSleepSessionRepository: SleepSessionRepository {
+    /// Le contexte ne retient pas la base : le dépôt la garde en vie lui-même.
+    private let container: ModelContainer
     private let context: ModelContext
 
     public init(container: ModelContainer) {
+        self.container = container
         context = container.mainContext
     }
 
