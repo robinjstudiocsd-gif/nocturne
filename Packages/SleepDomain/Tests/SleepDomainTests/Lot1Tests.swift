@@ -78,7 +78,8 @@ struct Lot1Tests {
         let saved = try await lifecycle.addManual(kind: .night, times: right, comment: "  ")
         #expect(saved.state == .manual)
         #expect(saved.comment == nil)
-        #expect(saved.sleepWindow == 7 * 3_600 + 15 * 60)
+        let expectedWindow: TimeInterval = (7 * 60 + 15) * 60
+        #expect(saved.sleepWindow == expectedWindow)
     }
 
     @Test("Correction : la détection reste, les réveils sont triés et comptés")
@@ -105,8 +106,10 @@ struct Lot1Tests {
         #expect(corrected.times.sleepOnset == date(22, 0, 58))
         #expect(corrected.wakeEpisodes.first?.start == date(22, 3, 37))
         #expect(corrected.significantWakeCount == 1)
-        #expect(corrected.wakeDuration == 12 * 60)
-        #expect(corrected.asleepDuration == 8 * 3_600 + 14 * 60 - 12 * 60)
+        let expectedWake: TimeInterval = 12 * 60
+        #expect(corrected.wakeDuration == expectedWake)
+        let expectedAsleep: TimeInterval = (8 * 60 + 14 - 12) * 60
+        #expect(corrected.asleepDuration == expectedAsleep)
     }
 
     @Test("Une nuit commencée après minuit appartient à la veille")
