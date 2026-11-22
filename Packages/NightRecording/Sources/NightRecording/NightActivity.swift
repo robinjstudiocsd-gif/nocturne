@@ -5,6 +5,12 @@ import SleepDomain
 
 extension NightActivityAttributes: @retroactive ActivityAttributes {}
 
+/// Une Live Activity n'est pas « Sendable » : on la transporte ainsi vers les tâches d'ActivityKit,
+/// qui la mettent à jour sans toucher à l'interface.
+private struct ActivityHandle: @unchecked Sendable {
+    let activity: Activity<NightActivityAttributes>
+}
+
 /// Live Activity « Nuit en cours » sur l'écran verrouillé.
 @MainActor
 final class NightActivityController {
@@ -29,8 +35,9 @@ final class NightActivityController {
 
     func update(_ state: NightActivityAttributes.ContentState) {
         guard let activity else { return }
-        Task { @MainActor in
-            await activity.update(ActivityContent(state: state, staleDate: nil))
+        let handle = ActivityHandle(activity: activity)
+        Task.detached {
+            await handle.activity.update(ActivityContent(state: state, staleDate: nil))
         }
     }
 
@@ -38,16 +45,18 @@ final class NightActivityController {
         guard let activity else { return }
         self.activity = nil
         let state = activity.content.state
-        Task { @MainActor in
-            await activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: .immediate)
+        let handle = ActivityHandle(activity: activity)
+        Task.detached {
+            await handle.activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: .immediate)
         }
     }
 
     /// Ferme les Live Activities restées affichées après une fermeture de l'app.
     func endStale() {
         for stale in Activity<NightActivityAttributes>.activities where stale.id != activity?.id {
-            Task { @MainActor in
-                await stale.end(nil, dismissalPolicy: .immediate)
+            let handle = ActivityHandle(activity: stale)
+            Task.detached {
+                await handle.activity.end(nil, dismissalPolicy: .immediate)
             }
         }
     }
