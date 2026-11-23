@@ -164,3 +164,17 @@ struct JournalRow: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+extension View {
+    /// Fiche de nuit et réécoute, ouvertes depuis un autre onglet (l'accueil ouvre la dernière nuit).
+    public func nightDestinations(journal model: JournalViewModel) -> some View {
+        navigationDestination(for: NightRoute.self) { route in
+            NightDetailView(route: route, dependencies: model.dependencies) {
+                await model.load()
+            }
+        }
+        .navigationDestination(for: ReplayRoute.self) { route in
+            ReplayView(session: route.session, dependencies: model.dependencies)
+        }
+    }
+}

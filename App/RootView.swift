@@ -22,22 +22,29 @@ struct RootView: View {
     @State private var showsSettings = false
     @State private var journalModel: JournalViewModel
     @State private var nightModel: NightViewModel
+    @State private var dashboardModel: DashboardViewModel
+    @State private var homePath = NavigationPath()
     @Environment(\.scenePhase) private var scenePhase
 
     init(container: AppContainer) {
         self.container = container
         _journalModel = State(initialValue: container.makeJournalModel())
         _nightModel = State(initialValue: container.makeNightModel())
+        _dashboardModel = State(initialValue: container.makeDashboardModel())
     }
 
     var body: some View {
         TabView(selection: $selection) {
             Tab("Accueil", systemImage: "house", value: AppTab.home) {
-                NavigationStack {
+                NavigationStack(path: $homePath) {
                     DashboardView(
+                        model: dashboardModel,
                         onPrepareNight: { selection = .night },
-                        onOpenSettings: { showsSettings = true }
+                        onOpenSettings: { showsSettings = true },
+                        onOpenNight: { homePath.append(NightRoute(id: $0)) },
+                        onReplay: { homePath.append(ReplayRoute(session: $0)) }
                     )
+                    .nightDestinations(journal: journalModel)
                 }
             }
             Tab("Journal", systemImage: "calendar", value: AppTab.journal) {
@@ -77,7 +84,10 @@ struct RootView: View {
         .fullScreenCover(isPresented: nightCoverBinding) {
             NightFlowView(model: nightModel) {
                 selection = .home
-                Task { await journalModel.load() }
+                Task {
+                    await journalModel.load()
+                    await dashboardModel.load()
+                }
             }
         }
         .task {

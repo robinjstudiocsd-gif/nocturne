@@ -76,6 +76,24 @@ struct NightAveragesTests {
         #expect(NightReporter.previousNights(of: tonight, among: previousNights()).map(\.times.bedtime) == [at(20, 22, 30), at(19, 23, 30), at(18, 23, 0)])
     }
 
+    @Test("Phrases de l'accueil : ce qui fait baisser le score, et la nuit comparée aux précédentes")
+    func insights() {
+        let format = SleepFormat(calendar: paris)
+        let tonight = night(bed: at(22, 0, 30), onset: at(22, 0, 45), wake: at(22, 7, 30), getUp: at(22, 7, 40))
+        let report = NightReporter(calendar: paris).report(for: tonight, among: previousNights() + [tonight])
+
+        #expect(NightInsight.scoreLine(report: report, session: tonight, format: format) == "Coucher 1 h 30 plus tard que ta moyenne : la régularité fait baisser le score.")
+        #expect(NightInsight.comparisonLine(report.comparison, format: format) == "Dernière nuit : 55 min de moins que ta moyenne, et un coucher 1 h 30 plus tard.")
+
+        var comparison = report.comparison
+        comparison.asleep = 40 * 60
+        comparison.bedtime = 107 * 60
+        #expect(NightInsight.comparisonLine(comparison, format: format) == "Dernière nuit : 40 min de plus que ta moyenne, mais un coucher 1 h 47 plus tard.")
+        comparison.bedtime = 10 * 60
+        comparison.asleep = 5 * 60
+        #expect(NightInsight.comparisonLine(comparison, format: format) == "Dernière nuit : une durée dans ta moyenne.")
+    }
+
     @Test("Écarts écrits avec leur signe")
     func differences() {
         let format = SleepFormat(calendar: paris)

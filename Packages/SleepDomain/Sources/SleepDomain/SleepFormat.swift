@@ -65,6 +65,11 @@ public struct SleepFormat: Sendable {
         "\(formatter("EEE").string(from: date)) \(clock(date))"
     }
 
+    /// « lun. »
+    public func shortWeekday(_ date: Date) -> String {
+        formatter("EEE").string(from: date)
+    }
+
     /// « jeu. 26 »
     public func weekdayAndDay(_ date: Date) -> String {
         formatter("EEE d").string(from: date)

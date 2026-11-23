@@ -1,4 +1,5 @@
 import AppSettings
+import DashboardFeature
 import Foundation
 import JournalFeature
 import NightFeature
@@ -70,6 +71,17 @@ final class AppContainer {
         if reduced > 0 {
             journal.record("Conservation : \(reduced) nuit(s) réduite(s) aux passages des événements")
         }
+    }
+
+    /// Modèle de vue de l'accueil : dernière nuit, dette de sommeil, régularité, 7 dernières nuits.
+    func makeDashboardModel() -> DashboardViewModel {
+        let preferences = preferences
+        return DashboardViewModel(dependencies: DashboardDependencies(
+            sessions: sessions,
+            events: events,
+            profiles: RecordedNightProfiles(storage: storage, events: events),
+            sleepNeed: { TimeInterval(preferences.sleepNeedMinutes * 60) }
+        ))
     }
 
     /// Modèle de vue du Journal : liste, fiches, modifications et ajouts.

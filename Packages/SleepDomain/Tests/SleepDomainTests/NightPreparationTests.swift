@@ -230,6 +230,7 @@ struct NightScreenTests {
         #expect(abs((night.first?.fraction ?? 0) - 73.0 / 513.0) < 0.0001)
         #expect(format.hourTicks(from: date(22, 14, 10), to: date(22, 16, 40)).map(\.label) == ["15:00", "16:00"])
         #expect(format.hourTicks(from: date(22, 1, 0), to: date(22, 1, 0)).isEmpty)
+        #expect(format.shortWeekday(date(22, 9, 0)) == "dim.")
     }
 
     @Test("Temps écouté : trous et coupure en cours retirés")
