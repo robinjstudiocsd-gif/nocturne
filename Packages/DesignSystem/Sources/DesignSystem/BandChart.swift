@@ -71,8 +71,8 @@ public struct BandChart: View {
             .frame(width: 76, alignment: .leading)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
-                Canvas { context, size in
-                    draw(in: &context, size: size)
+                Canvas { [rows, segments] context, size in
+                    Self.draw(in: &context, size: size, rows: rows, segments: segments)
                 }
                 .frame(height: CGFloat(rows.count) * Self.rowHeight - 4)
                 .accessibilityElement()
@@ -93,9 +93,11 @@ public struct BandChart: View {
         }
     }
 
-    private func draw(in context: inout GraphicsContext, size: CGSize) {
+    /// Dessin sans état : utilisable quel que soit le fil qui rend le graphique.
+    nonisolated private static func draw(in context: inout GraphicsContext, size: CGSize, rows: [BandRow], segments: [BandSegment]) {
+        let rowHeight: CGFloat = 20
         let x = { (fraction: Double) -> CGFloat in CGFloat(min(1, max(0, fraction))) * size.width }
-        let center = { (row: Int) -> CGFloat in CGFloat(row) * Self.rowHeight + 8 }
+        let center = { (row: Int) -> CGFloat in CGFloat(row) * rowHeight + 8 }
         var links = Path()
         for index in segments.indices.dropFirst() {
             let previous = segments[index - 1]
@@ -107,7 +109,7 @@ public struct BandChart: View {
         context.stroke(links, with: .color(NocturneColor.chartLink), lineWidth: 1)
         for segment in segments where rows.indices.contains(segment.row) {
             let width = max(1.5, x(segment.end) - x(segment.start) - 1)
-            let rect = CGRect(x: x(segment.start) + 0.5, y: CGFloat(segment.row) * Self.rowHeight + 2, width: width, height: 12)
+            let rect = CGRect(x: x(segment.start) + 0.5, y: CGFloat(segment.row) * rowHeight + 2, width: width, height: 12)
             context.fill(Path(roundedRect: rect, cornerRadius: min(3, width / 2)), with: .color(rows[segment.row].color))
         }
     }
