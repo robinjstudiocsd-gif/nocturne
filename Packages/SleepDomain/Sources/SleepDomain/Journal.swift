@@ -281,7 +281,8 @@ extension SleepSession {
     /// Temps réellement écouté : du début de la session à son arrêt (ou à `now`), moins les trous.
     public func listenedDuration(gaps: [RecordingGap], cut: ListeningCut? = nil, until now: Date) -> TimeInterval {
         guard recordingMode != .off, let start = detected.bedtime else { return 0 }
-        let end = state == .running ? now : (detected.wake ?? now)
+        // L'écoute s'arrête au lever (arrêt de la session) ; le réveil estimé peut être plus tôt.
+        let end = state == .running ? now : (detected.getUp ?? detected.wake ?? now)
         guard end > start else { return 0 }
         let missing = gaps.reduce(0) { total, gap in
             total + max(0, min(gap.end, end).timeIntervalSince(max(gap.start, start)))

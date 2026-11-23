@@ -237,6 +237,11 @@ struct NightScreenTests {
         status.cut = nil
         #expect(status.listenedDuration(until: date(23, 9, 0)) == TimeInterval(2 * 3_600 + 59 * 60))
 
+        // Le réveil estimé (02:31) peut précéder l'arrêt (02:41) : l'écoute dure jusqu'à l'arrêt.
+        session.detected.getUp = date(23, 2, 41)
+        status.session = session
+        #expect(status.listenedDuration(until: date(23, 9, 0)) == TimeInterval(3 * 3_600 + 9 * 60))
+
         status.mode = .off
         #expect(status.listenedDuration(until: date(23, 9, 0)) == 0)
     }

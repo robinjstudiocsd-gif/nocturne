@@ -45,7 +45,7 @@ public final class NightReplayer: NightReplaying {
             peaks = series.peaks
             means = series.means
         }
-        let stopTime = session.detected.wake ?? segments.last?.end ?? start
+        let stopTime = session.detected.getUp ?? session.detected.wake ?? segments.last?.end ?? start
         let duration = max(TimeInterval(peaks.count), stopTime.timeIntervalSince(start), 1)
 
         let composition = await NightComposition.build(segments: segments, start: start, storage: storage)?.composition

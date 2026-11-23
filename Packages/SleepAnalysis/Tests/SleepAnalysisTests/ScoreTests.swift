@@ -96,6 +96,24 @@ struct ScoreTests {
         #expect(unreliable.missing.contains("Durée : horaires trop peu fiables"))
     }
 
+    @Test("Fiabilité des horaires selon leur origine ; une correction vaut une saisie")
+    func timesReliability() {
+        var night = shortNight()
+        night.primarySource = .microphone
+        #expect(night.timesReliability == .low)
+        #expect(ScoreInput(session: night).timesReliability == .low)
+
+        night.corrected.wake = at(22, 6, 30)
+        #expect(night.timesReliability == .medium)
+
+        night.primarySource = .watch
+        #expect(night.timesReliability == .high)
+
+        night.primarySource = .motion
+        night.corrected = SessionTimes()
+        #expect(night.timesReliability == .medium)
+    }
+
     @Test("Régularité : il faut 3 nuits précédentes ; écart aux cibles sur le cadran")
     func regularityAndGoals() {
         let two = scorer.score(ScoreInput(session: shortNight(), previousNights: Array(previousNights().prefix(2))))

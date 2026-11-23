@@ -25,6 +25,24 @@ public enum Reliability: Int, Comparable, Codable, Sendable {
     }
 }
 
+extension SleepSession {
+    /// Fiabilité des horaires retenus (METHODOLOGIE-SCORE.md) : élevée avec une montre, moyenne avec l'iPhone
+    /// sur le lit ou des horaires saisis ou corrigés par la personne, faible avec le son seul.
+    public var timesReliability: Reliability {
+        if primarySource == .watch {
+            return .high
+        }
+        if corrected.sleepOnset != nil || corrected.wake != nil {
+            return .medium
+        }
+        switch primarySource {
+        case .watch: return .high
+        case .motion, .manual: return .medium
+        case .microphone: return .low
+        }
+    }
+}
+
 /// Les six critères du score (étude, « Score de sommeil sur 100 »).
 public enum ScoreCriterion: String, CaseIterable, Codable, Sendable {
     case duration
@@ -156,16 +174,16 @@ public struct ScoreInput: Sendable {
     public var session: SleepSession
     /// Nuits précédentes, pour la régularité (les 7 dernières servent).
     public var previousNights: [SleepSession]
-    /// Fiabilité des horaires de la nuit (détection du téléphone, montre, saisie).
+    /// Fiabilité des horaires de la nuit (détection du téléphone, montre, saisie) ; par défaut, celle de la session.
     public var timesReliability: Reliability
     /// Phases de la montre ; nil sans montre (l'estimation expérimentale n'entre jamais dans le score).
     public var stages: StageShares?
     public var goals: ScoreGoals
 
-    public init(session: SleepSession, previousNights: [SleepSession] = [], timesReliability: Reliability = .medium, stages: StageShares? = nil, goals: ScoreGoals = ScoreGoals()) {
+    public init(session: SleepSession, previousNights: [SleepSession] = [], timesReliability: Reliability? = nil, stages: StageShares? = nil, goals: ScoreGoals = ScoreGoals()) {
         self.session = session
         self.previousNights = previousNights
-        self.timesReliability = timesReliability
+        self.timesReliability = timesReliability ?? session.timesReliability
         self.stages = stages
         self.goals = goals
     }

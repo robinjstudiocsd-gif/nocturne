@@ -153,7 +153,7 @@ public final class MorningViewModel {
     public func set(_ field: TimeField, hour: Int, minute: Int) {
         let times = preview.times
         let bedtime = times.bedtime ?? session.createdAt
-        let stop = session.detected.wake ?? times.wake ?? now()
+        let stop = session.detected.getUp ?? session.detected.wake ?? times.wake ?? now()
         switch field {
         case .sleepOnset:
             let end = max(bedtime, times.wake ?? stop)
