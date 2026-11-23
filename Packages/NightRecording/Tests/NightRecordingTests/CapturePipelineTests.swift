@@ -269,3 +269,57 @@ struct AudioRetentionTests {
         #expect(try await recordings.segments(sessionID: recent.id).count == 2)
     }
 }
+
+@Suite("Archives vers le PC")
+struct NightArchiverTests {
+    private static let paris: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+        return calendar
+    }()
+
+    @Test("Liste des événements pour Excel et nom de fichier accepté par Windows")
+    func csv() {
+        let start = Self.paris.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 2, minute: 25))!
+        let event = NightEvent(sessionID: UUID(), kind: .snoring, start: start, duration: 130, confidence: 0.92, intensity: 14, isFavorite: true, clipPath: "Recordings/2026-11-21/x/extrait-001.m4a")
+
+        let csv = NightArchiver.eventsCSV([event], format: SleepFormat(calendar: Self.paris))
+        #expect(csv == "Heure;Type;Durée (s);Confiance;Intensité;Pas moi;Favori;Extrait\r\n02:25:00;Ronflement;130,0;92 %;moyenne;non;oui;extrait-001.m4a\r\n")
+        #expect(NightArchiver.fileName("Nuit du 21/22: test?") == "Nuit du 21-22- test-")
+    }
+
+    @Test("Archive d'une nuit : un .zip rangé dans Documents/Archives")
+    func archive() async throws {
+        let storage = try temporaryStorage()
+        let documents = FileManager.default.temporaryDirectory.appendingPathComponent("Documents-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: storage.root)
+            try? FileManager.default.removeItem(at: documents)
+        }
+        let start = Self.paris.date(from: DateComponents(year: 2026, month: 11, day: 21, hour: 23, minute: 30))!
+        let session = SleepSession(state: .finished, detected: SessionTimes(bedtime: start, wake: start.addingTimeInterval(8), getUp: start.addingTimeInterval(8)), comment: "Test d’archive")
+        let recordings = InMemoryRecordingRepository()
+        let writer = try SegmentWriter(root: storage.root, layout: SegmentLayout(sessionID: session.id, start: start), quality: .standard)
+        for step in 0..<8 {
+            _ = try writer.append(tone(format: writer.processingFormat, seconds: 1, amplitude: 0.2), at: start.addingTimeInterval(Double(step)))
+        }
+        if let last = writer.finish() {
+            try await recordings.save(last)
+        }
+        let events = InMemoryNightEventRepository([NightEvent(sessionID: session.id, kind: .cough, start: start.addingTimeInterval(3), duration: 1, confidence: 0.9, intensity: 22)])
+
+        let archiver = NightArchiver(storage: storage, recordings: recordings, events: events, documents: documents, calendar: Self.paris)
+        let url = try await archiver.archive(session)
+
+        #expect(url.lastPathComponent == "Nuit du samedi 21 au dimanche 22 novembre.zip")
+        #expect(url.deletingLastPathComponent() == archiver.folder)
+        let data = try Data(contentsOf: url)
+        #expect(data.prefix(2) == Data("PK".utf8))
+        #expect(data.count > 1_000)
+
+        let summary = NightArchiver.summary(session, gaps: [], events: try await events.events(sessionID: session.id), segments: [], eveningLog: nil, calendar: Self.paris)
+        #expect(summary.contains("Coucher : 23:30"))
+        #expect(summary.contains("Toux : 1, 1 s"))
+        #expect(summary.contains("Commentaire : Test d’archive"))
+    }
+}

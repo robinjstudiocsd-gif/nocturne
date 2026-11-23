@@ -30,6 +30,18 @@ public struct SleepFormat: Sendable {
         return String(format: "%d h %02d", hours, rest)
     }
 
+    /// « 6 s », « 2 min 10 », « 1 h 05 » : pour les sons, souvent courts.
+    public func span(_ interval: TimeInterval) -> String {
+        let seconds = max(0, Int(interval.rounded()))
+        if seconds < 60 {
+            return "\(seconds) s"
+        }
+        if seconds < 3_600 {
+            return String(format: "%d min %02d", seconds / 60, seconds % 60)
+        }
+        return String(format: "%d h %02d", seconds / 3_600, (seconds % 3_600) / 60)
+    }
+
     /// « 7h51 », « 45 min » : pour les petites cases du calendrier.
     public func shortDuration(_ interval: TimeInterval) -> String {
         let minutes = max(0, Int((interval / 60).rounded()))
