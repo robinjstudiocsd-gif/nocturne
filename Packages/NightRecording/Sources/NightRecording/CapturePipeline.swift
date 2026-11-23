@@ -20,6 +20,7 @@ public final class CapturePipeline: @unchecked Sendable {
     public let layout: SegmentLayout
 
     private let segmentWriter: SegmentWriter?
+    private let clipWriter: ClipWriter?
     private let levelWriter: LevelSeriesWriter
     private var meter: LevelMeter
     private let lock = NSLock()
@@ -32,6 +33,7 @@ public final class CapturePipeline: @unchecked Sendable {
     private var trigger: DetectionTrigger
     private var aggregator: EventAggregator
     private var analyzeUntilSecond = -1
+    private var loudUntilSecond = -1
     /// Écart au bruit de fond des dernières secondes, pour l'intensité des événements.
     private var recentIntensity: [Int: Float] = [:]
 
@@ -67,6 +69,18 @@ public final class CapturePipeline: @unchecked Sendable {
         } else {
             segmentWriter = nil
         }
+        if let limits = ClipWriter.limits(for: mode) {
+            clipWriter = try ClipWriter(
+                root: storage.root,
+                layout: layout,
+                quality: quality,
+                maxDuration: limits.maxDuration,
+                maxClips: limits.maxClips,
+                firstIndex: resume?.nextSegmentIndex ?? 1
+            )
+        } else {
+            clipWriter = nil
+        }
 
         let levelsURL = storage.url(for: layout.relativeLevelsPath)
         if resume != nil, FileManager.default.fileExists(atPath: levelsURL.path) {
@@ -80,6 +94,11 @@ public final class CapturePipeline: @unchecked Sendable {
         trigger = DetectionTrigger(threshold: threshold)
         aggregator = EventAggregator(sessionID: layout.sessionID)
         classifier = makeClassifier?(format, layout.start)
+    }
+
+    /// Vrai si les sons sont classés pendant la nuit.
+    public var classifiesSounds: Bool {
+        classifier != nil
     }
 
     /// Dernier niveau mesuré, en dBFS.
@@ -109,7 +128,7 @@ public final class CapturePipeline: @unchecked Sendable {
             level = newLevel
         }
         snapshotSecond = meter.currentSecond
-        snapshotSegment = segmentWriter?.nextSegmentIndex ?? 1
+        snapshotSegment = segmentWriter?.nextSegmentIndex ?? clipWriter?.nextClipIndex ?? 1
         lock.unlock()
     }
 
@@ -130,22 +149,35 @@ public final class CapturePipeline: @unchecked Sendable {
         if let segmentWriter, let finished = try segmentWriter.append(buffer, at: time) {
             output.finishedSegments.append(finished)
         }
-        output.events = classify(buffer, second: second, time: time, levels: output.levels)
+        track(output.levels, second: second)
+        if let clipWriter, let clip = try clipWriter.append(buffer, at: time, loud: second <= loudUntilSecond) {
+            output.finishedSegments.append(clip)
+        }
+        output.events = classify(buffer, second: second, time: time)
         updateSnapshot(level: output.levels.last?.meanDb)
         return output
     }
 
-    /// Bruit de fond, déclenchement du classifieur, puis regroupement des détections en événements.
-    private func classify(_ buffer: AVAudioPCMBuffer, second: Int, time: Date, levels: [LevelSecond]) -> [NightEvent] {
-        guard let classifier else { return [] }
+    /// Bruit de fond, passages au-dessus du seuil (pour les extraits) et déclenchement du classifieur.
+    private func track(_ levels: [LevelSecond], second: Int) {
         for level in levels {
             let floor = noiseFloor.add(level.meanDb)
             recentIntensity[level.second] = level.maxDb - floor
+            if level.maxDb >= floor + trigger.threshold {
+                loudUntilSecond = level.second + 3
+            }
             if trigger.shouldAnalyze(second: level.second, level: level.maxDb, floor: floor) {
                 analyzeUntilSecond = level.second + 1
             }
         }
-        recentIntensity = recentIntensity.filter { $0.key >= second - 120 }
+        if !levels.isEmpty {
+            recentIntensity = recentIntensity.filter { $0.key >= second - 120 }
+        }
+    }
+
+    /// Classement des sons, puis regroupement des détections en événements.
+    private func classify(_ buffer: AVAudioPCMBuffer, second: Int, time: Date) -> [NightEvent] {
+        guard let classifier else { return [] }
         let position = AVAudioFramePosition(time.timeIntervalSince(layout.start) * processingFormat.sampleRate)
         classifier.process(buffer, framePosition: position, active: second <= analyzeUntilSecond)
         var events = absorb(classifier.drain())
@@ -177,10 +209,11 @@ public final class CapturePipeline: @unchecked Sendable {
     public func interrupt() -> AudioSegment? {
         classifier?.reset()
         analyzeUntilSecond = -1
+        loudUntilSecond = -1
         if let pending = meter.flush() {
             try? levelWriter.append([pending])
         }
-        let segment = segmentWriter?.finish(state: .truncated)
+        let segment = segmentWriter?.finish(state: .truncated) ?? clipWriter?.finish(state: .truncated)
         updateSnapshot(level: nil)
         return segment
     }
@@ -190,7 +223,7 @@ public final class CapturePipeline: @unchecked Sendable {
         if let pending = meter.flush() {
             try? levelWriter.append([pending])
         }
-        let last = segmentWriter?.finish(state: .complete)
+        let last = segmentWriter?.finish(state: .complete) ?? clipWriter?.finish(state: .complete)
         try? levelWriter.close()
         updateSnapshot(level: nil)
         return last

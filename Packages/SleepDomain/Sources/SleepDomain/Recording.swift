@@ -108,6 +108,7 @@ public struct RecordingGap: Identifiable, Hashable, Codable, Sendable {
 public protocol RecordingRepository: Sendable {
     func segments(sessionID: UUID) async throws -> [AudioSegment]
     func save(_ segment: AudioSegment) async throws
+    func delete(segmentID: UUID) async throws
     func gaps(sessionID: UUID) async throws -> [RecordingGap]
     /// Tous les trous, de toutes les sessions, pour la liste du journal.
     func allGaps() async throws -> [RecordingGap]
@@ -149,6 +150,10 @@ public actor InMemoryRecordingRepository: RecordingRepository {
 
     public func save(_ segment: AudioSegment) async throws {
         segmentStore[segment.id] = segment
+    }
+
+    public func delete(segmentID: UUID) async throws {
+        segmentStore[segmentID] = nil
     }
 
     public func gaps(sessionID: UUID) async throws -> [RecordingGap] {

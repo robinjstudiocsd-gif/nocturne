@@ -33,6 +33,11 @@ public final class SwiftDataRecordingRepository: RecordingRepository {
         try context.save()
     }
 
+    public func delete(segmentID: UUID) async throws {
+        try context.delete(model: AudioSegmentRecord.self, where: #Predicate<AudioSegmentRecord> { $0.id == segmentID })
+        try context.save()
+    }
+
     public func gaps(sessionID: UUID) async throws -> [RecordingGap] {
         let descriptor = FetchDescriptor<RecordingGapRecord>(
             predicate: #Predicate<RecordingGapRecord> { $0.sessionID == sessionID },

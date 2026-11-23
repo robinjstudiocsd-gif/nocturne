@@ -26,6 +26,11 @@ public struct SegmentLayout: Sendable {
         relativeFolder + String(format: "/tranche-%03d.m4a", index)
     }
 
+    /// Extrait autour d'un son (modes événements et économie).
+    public func relativeClipPath(index: Int) -> String {
+        relativeFolder + String(format: "/extrait-%03d.m4a", index)
+    }
+
     public var relativeLevelsPath: String {
         relativeFolder + "/niveaux.ncls"
     }

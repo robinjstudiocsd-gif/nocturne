@@ -82,12 +82,16 @@ public final class NightSessionController: NightRecordingService {
     public func stop() async throws -> SleepSession? {
         guard let session = try await lifecycle.running() else { return nil }
         stopListening()
+        let classified = pipeline?.classifiesSounds ?? false
         if let remaining = pipeline?.closeEvents(), !remaining.isEmpty {
             try? await events.save(remaining)
             status.eventCount += remaining.count
         }
         if let last = pipeline?.finish() {
             try? await recordings.save(last)
+        }
+        if classified, status.mode == .events || status.mode == .economy {
+            await linkClips(sessionID: session.id)
         }
         pipeline = nil
         await closePendingGap()
@@ -292,6 +296,30 @@ public final class NightSessionController: NightRecordingService {
             journal.record("Services audio d'iOS réinitialisés")
             Task { await resume() }
         }
+    }
+
+    /// Modes événements et économie : chaque événement pointe vers son extrait,
+    /// et les extraits où aucun son n'a été reconnu sont effacés.
+    private func linkClips(sessionID: UUID) async {
+        guard
+            let clips = try? await recordings.segments(sessionID: sessionID),
+            let nightEvents = try? await events.events(sessionID: sessionID)
+        else { return }
+        var linked: [NightEvent] = []
+        for var event in nightEvents where event.clipPath == nil {
+            if let clip = clips.first(where: { $0.start <= event.start && event.start <= $0.end }) {
+                event.clipPath = clip.relativePath
+                linked.append(event)
+            }
+        }
+        try? await events.save(linked)
+        var removed = 0
+        for clip in clips where !nightEvents.contains(where: { $0.start <= clip.end && $0.end >= clip.start }) {
+            try? FileManager.default.removeItem(at: storage.url(for: clip.relativePath))
+            try? await recordings.delete(segmentID: clip.id)
+            removed += 1
+        }
+        journal.record("Extraits : \(clips.count - removed) gardés, \(removed) sans son reconnu effacés")
     }
 
     private func closePendingGap() async {

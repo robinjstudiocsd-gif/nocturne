@@ -48,6 +48,29 @@ private final class FakeClassifier: SoundClassifying, @unchecked Sendable {
 
 @Suite("Écoute · traitement des blocs")
 struct CapturePipelineTests {
+    @Test("Mode événements : un extrait autour de chaque son, avec du son avant et après")
+    func clips() throws {
+        let storage = try temporaryStorage()
+        defer { try? FileManager.default.removeItem(at: storage.root) }
+        let start = Date(timeIntervalSince1970: 1_795_300_000)
+        let pipeline = try CapturePipeline(storage: storage, layout: SegmentLayout(sessionID: UUID(), start: start), mode: .events, quality: .standard)
+        let format = pipeline.processingFormat
+        var clips: [AudioSegment] = []
+        for step in 0..<40 {
+            let amplitude: Float = (20..<22).contains(step) ? 0.3 : 0.001
+            clips += try pipeline.process(tone(format: format, seconds: 1, amplitude: amplitude), at: start.addingTimeInterval(Double(step))).finishedSegments
+        }
+
+        #expect(clips.count == 1)
+        let clip = try #require(clips.first)
+        #expect(clip.relativePath.hasSuffix("extrait-001.m4a"))
+        #expect(clip.start == start.addingTimeInterval(15))
+        #expect(clip.duration > 8 && clip.duration < 16)
+        #expect(clip.byteSize > 0)
+        #expect(pipeline.nextSegmentIndex == 2)
+        #expect(pipeline.finish() == nil)
+    }
+
     @Test("Événements : le classifieur écoute au-dessus du bruit de fond, les détections deviennent des événements")
     func events() throws {
         let storage = try temporaryStorage()
