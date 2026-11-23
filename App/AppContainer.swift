@@ -7,6 +7,7 @@ import Persistence
 import SettingsFeature
 import SleepDomain
 import SwiftData
+import UIKit
 
 /// Assemblage des dépendances : la seule partie de l'app qui connaît les vrais services.
 @MainActor
@@ -28,6 +29,8 @@ final class AppContainer {
     let preflight: DevicePreflight
     let eraser: RecordingEraser
     let storage: RecordingStorage
+    let retention: AudioRetention
+    private var isReducingAudio = false
 
     init(modelContainer: ModelContainer, journal: any DiagnosticJournal, defaults: UserDefaults, bundleURL: URL, storage: RecordingStorage) {
         let sessions = SwiftDataSleepSessionRepository(container: modelContainer)
@@ -49,6 +52,24 @@ final class AppContainer {
         self.preflight = DevicePreflight(storage: storage, signatureExpiry: signing.expirationDate)
         self.eraser = RecordingEraser(storage: storage, recordings: recordings, events: events)
         self.storage = storage
+        self.retention = AudioRetention(storage: storage, sessions: sessions, recordings: recordings, events: events, journal: journal)
+    }
+
+    /// Réduit l'audio continu des nuits anciennes aux passages des événements.
+    /// Travail lourd : seulement iPhone en charge, et jamais pendant une nuit.
+    func reduceOldAudioIfCharging() async {
+        guard !isReducingAudio else { return }
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let battery = UIDevice.current.batteryState
+        guard battery == .charging || battery == .full else { return }
+        let status = await night.currentStatus()
+        guard !status.isRunning else { return }
+        isReducingAudio = true
+        defer { isReducingAudio = false }
+        let reduced = await retention.apply(keepingNights: preferences.audioRetentionNights)
+        if reduced > 0 {
+            journal.record("Conservation : \(reduced) nuit(s) réduite(s) aux passages des événements")
+        }
     }
 
     /// Modèle de vue du Journal : liste, fiches, modifications et ajouts.

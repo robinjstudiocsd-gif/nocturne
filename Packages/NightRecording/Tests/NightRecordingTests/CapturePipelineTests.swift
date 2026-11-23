@@ -209,3 +209,63 @@ struct MotionTests {
         #expect(RecoveryPlanner.plan(checkpoint: nil, running: session, now: Date(timeIntervalSince1970: 1_795_330_000)) == .nothing)
     }
 }
+
+@MainActor
+@Suite("Conservation de l'audio")
+struct AudioRetentionTests {
+    @Test("Passages : 5 s avant, 20 s d'un long événement et 5 s après, fusionnés quand ils se touchent")
+    func passages() {
+        let start = Date(timeIntervalSince1970: 1_795_300_000)
+        let session = UUID()
+        let events = [
+            NightEvent(sessionID: session, kind: .snoring, start: start.addingTimeInterval(100), duration: 300, confidence: 0.9, intensity: 10),
+            NightEvent(sessionID: session, kind: .speech, start: start.addingTimeInterval(120), duration: 4, confidence: 0.7, intensity: 8),
+            NightEvent(sessionID: session, kind: .cough, start: start.addingTimeInterval(600), duration: 2, confidence: 0.8, intensity: 12)
+        ]
+        #expect(AudioRetention.passages(for: events, start: start) == [95...129, 595...607])
+    }
+
+    @Test("Les nuits anciennes gardent les passages des événements, les récentes tout leur audio")
+    func reduceOldNights() async throws {
+        let storage = try temporaryStorage()
+        defer { try? FileManager.default.removeItem(at: storage.root) }
+        let oldStart = Date(timeIntervalSince1970: 1_795_300_000)
+        let newStart = oldStart.addingTimeInterval(86_400)
+        let old = SleepSession(state: .finished, detected: SessionTimes(bedtime: oldStart, wake: oldStart.addingTimeInterval(12)))
+        let recent = SleepSession(state: .finished, detected: SessionTimes(bedtime: newStart, wake: newStart.addingTimeInterval(12)))
+        let sessions = InMemorySleepSessionRepository([old, recent])
+        let recordings = InMemoryRecordingRepository()
+        let events = InMemoryNightEventRepository([NightEvent(sessionID: old.id, kind: .cough, start: oldStart.addingTimeInterval(6), duration: 1, confidence: 0.9, intensity: 20)])
+
+        var oldTranches: [AudioSegment] = []
+        for (session, start) in [(old, oldStart), (recent, newStart)] {
+            let writer = try SegmentWriter(root: storage.root, layout: SegmentLayout(sessionID: session.id, start: start), quality: .standard, segmentDuration: 6)
+            for step in 0..<12 {
+                if let finished = try writer.append(tone(format: writer.processingFormat, seconds: 1, amplitude: 0.2), at: start.addingTimeInterval(Double(step))) {
+                    try await recordings.save(finished)
+                    if session.id == old.id { oldTranches.append(finished) }
+                }
+            }
+            if let last = writer.finish() {
+                try await recordings.save(last)
+                if session.id == old.id { oldTranches.append(last) }
+            }
+        }
+
+        let retention = AudioRetention(storage: storage, sessions: sessions, recordings: recordings, events: events, journal: SilentDiagnosticJournal())
+        let reduced = await retention.apply(keepingNights: 1)
+
+        #expect(reduced == 1)
+        let oldSegments = try await recordings.segments(sessionID: old.id)
+        #expect(oldSegments.count == 1)
+        let clip = try #require(oldSegments.first)
+        #expect(clip.relativePath.hasSuffix("extrait-003.m4a"))
+        #expect(clip.start == oldStart.addingTimeInterval(1))
+        #expect(FileManager.default.fileExists(atPath: storage.url(for: clip.relativePath).path))
+        for tranche in oldTranches {
+            #expect(!FileManager.default.fileExists(atPath: storage.url(for: tranche.relativePath).path))
+        }
+        #expect(try await events.events(sessionID: old.id).first?.clipPath == clip.relativePath)
+        #expect(try await recordings.segments(sessionID: recent.id).count == 2)
+    }
+}

@@ -21,6 +21,7 @@ public final class NightViewModel {
     }
     private var currentPlan: NightPlan
     public private(set) var checks: [PreflightItem] = []
+    private var lastReadings: PreflightReadings? = nil
     public private(set) var status: NightStatus = .idle
     public private(set) var isStarting = false
     public private(set) var isStopping = false
@@ -110,6 +111,7 @@ public final class NightViewModel {
 
     public func refreshChecks() async {
         let readings = await preflight.readings()
+        lastReadings = readings
         let moment = now()
         checks = Preflight.evaluate(
             readings,
@@ -154,8 +156,10 @@ public final class NightViewModel {
         isStarting = true
         defer { isStarting = false }
         let moment = now()
+        // Sous 1 Go libre, l'audio continu ne tiendrait pas : la nuit passe en mode événements.
+        let mode = Preflight.effectiveMode(plan.mode, freeBytes: lastReadings?.freeBytes)
         do {
-            _ = try await service.start(kind: plan.kind, mode: plan.mode, alarm: plan.alarm(startingAt: moment, calendar: format.calendar))
+            _ = try await service.start(kind: plan.kind, mode: mode, alarm: plan.alarm(startingAt: moment, calendar: format.calendar))
             apply(await service.currentStatus())
         } catch {
             alertMessage = "La session n’a pas pu commencer. \(error.localizedDescription)"

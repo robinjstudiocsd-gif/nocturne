@@ -105,6 +105,14 @@ public enum Preflight {
     public static let storageMargin: Int64 = 500_000_000
     /// Renouveler la signature quand il reste moins de deux jours.
     public static let renewalMargin: TimeInterval = 2 * 86_400
+    /// Sous ce seuil, une nuit en mode continu passe en mode événements (étude, « Stockage plein »).
+    public static let lowStorage: Int64 = 1_000_000_000
+
+    /// Le mode réellement utilisé : sous 1 Go libre, le mode continu devient le mode événements.
+    public static func effectiveMode(_ mode: RecordingMode, freeBytes: Int64?) -> RecordingMode {
+        guard mode == .continuous, let freeBytes, freeBytes < lowStorage else { return mode }
+        return .events
+    }
 
     /// Taille estimée d'une nuit de 9 heures, audio et séries comprises.
     public static func estimatedBytes(mode: RecordingMode, quality: AudioQuality, hours: Double = 9) -> Int64 {
@@ -187,6 +195,15 @@ public enum Preflight {
             return PreflightItem(kind: .storage, status: .unknown, title: title, value: "inconnu")
         }
         let needed = estimatedBytes(mode: mode, quality: quality)
+        if effectiveMode(mode, freeBytes: free) != mode {
+            return PreflightItem(
+                kind: .storage,
+                status: .warning,
+                title: title,
+                value: format.bytes(free),
+                detail: "Moins de 1 Go libre : la nuit passera en mode événements"
+            )
+        }
         if mode != .off && free < needed + storageMargin {
             return PreflightItem(
                 kind: .storage,

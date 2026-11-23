@@ -85,10 +85,13 @@ struct RootView: View {
         }
         .task {
             await container.night.recoverIfNeeded()
+            await container.reduceOldAudioIfCharging()
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
-            case .active: container.journal.record("App au premier plan")
+            case .active:
+                container.journal.record("App au premier plan")
+                Task { await container.reduceOldAudioIfCharging() }
             case .background: container.journal.record("App en arrière-plan")
             default: break
             }

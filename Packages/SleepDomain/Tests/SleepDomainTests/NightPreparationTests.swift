@@ -157,8 +157,12 @@ struct PreflightTests {
 
         let item = evaluate(readings, alarm: alarm)[2]
         #expect(item.status == .warning)
-        #expect(item.detail == "Libère de la place : une nuit prend environ 131 Mo")
+        #expect(item.detail == "Moins de 1 Go libre : la nuit passera en mode événements")
+        #expect(evaluate(readings, mode: .events, alarm: alarm)[2].detail == "Libère de la place : une nuit prend environ 31 Mo")
         #expect(evaluate(readings, mode: .off, alarm: alarm)[2].status == .ready)
+        #expect(Preflight.effectiveMode(.continuous, freeBytes: 400_000_000) == .events)
+        #expect(Preflight.effectiveMode(.continuous, freeBytes: 41_000_000_000) == .continuous)
+        #expect(Preflight.effectiveMode(.economy, freeBytes: 400_000_000) == .economy)
     }
 
     @Test("Autorisations : micro d'abord, puis notifications")

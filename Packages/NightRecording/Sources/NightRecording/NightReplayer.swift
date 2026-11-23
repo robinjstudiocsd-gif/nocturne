@@ -48,34 +48,8 @@ public final class NightReplayer: NightReplaying {
         let stopTime = session.detected.wake ?? segments.last?.end ?? start
         let duration = max(TimeInterval(peaks.count), stopTime.timeIntervalSince(start), 1)
 
-        let composition = AVMutableComposition()
-        var hasAudio = false
-        if let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            var cursor = CMTime.zero
-            for segment in segments {
-                let url = storage.url(for: segment.relativePath)
-                guard FileManager.default.fileExists(atPath: url.path) else { continue }
-                let asset = AVURLAsset(url: url)
-                guard
-                    let source = try? await asset.loadTracks(withMediaType: .audio).first,
-                    let length = try? await asset.load(.duration),
-                    length.seconds > 0
-                else { continue }
-                var at = CMTime(seconds: max(0, segment.start.timeIntervalSince(start)), preferredTimescale: 600)
-                if at > cursor {
-                    track.insertEmptyTimeRange(CMTimeRange(start: cursor, end: at))
-                } else {
-                    at = cursor
-                }
-                do {
-                    try track.insertTimeRange(CMTimeRange(start: .zero, duration: length), of: source, at: at)
-                    cursor = at + length
-                    hasAudio = true
-                } catch {
-                    continue
-                }
-            }
-        }
+        let composition = await NightComposition.build(segments: segments, start: start, storage: storage)?.composition
+        let hasAudio = composition != nil
 
         let busy = nightEvents.map { event -> ClosedRange<TimeInterval> in
             let from = max(0, event.start.timeIntervalSince(start))
@@ -93,7 +67,7 @@ public final class NightReplayer: NightReplaying {
         )
         self.timeline = timeline
         self.composition = composition
-        if hasAudio {
+        if let composition {
             let item = AVPlayerItem(asset: composition)
             item.audioTimePitchAlgorithm = .timeDomain
             let player = AVPlayer(playerItem: item)
@@ -166,16 +140,10 @@ public final class NightReplayer: NightReplaying {
     }
 
     public func exportPassage(around position: TimeInterval) async throws -> URL {
-        guard let composition, let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
-            throw RecordingError.unsupportedFormat
-        }
-        let from = max(0, position - 30)
-        let to = min(state.duration, position + 30)
-        export.timeRange = CMTimeRange(start: CMTime(seconds: from, preferredTimescale: 600), end: CMTime(seconds: to, preferredTimescale: 600))
+        guard let composition else { throw RecordingError.unsupportedFormat }
         let clock = timeline.map { SleepFormat().clock($0.date(at: position)).replacingOccurrences(of: ":", with: "h") } ?? "passage"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("Nocturne-\(clock).m4a")
-        try? FileManager.default.removeItem(at: url)
-        try await export.export(to: url, as: .m4a)
+        try await NightComposition.export(composition, from: position - 30, to: min(state.duration, position + 30), url: url)
         return url
     }
 
