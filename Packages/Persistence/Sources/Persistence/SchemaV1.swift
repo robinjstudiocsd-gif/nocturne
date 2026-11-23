@@ -149,6 +149,7 @@ public enum SchemaV1: VersionedSchema {
         public var originRaw: String
         public var isSomeoneElse: Bool
         public var isFavorite: Bool
+        public var label: String?
         public var clipPath: String?
 
         public init(event: NightEvent) {
@@ -163,6 +164,7 @@ public enum SchemaV1: VersionedSchema {
             originRaw = event.origin.rawValue
             isSomeoneElse = event.isSomeoneElse
             isFavorite = event.isFavorite
+            label = event.label
             clipPath = event.clipPath
         }
     }
@@ -317,6 +319,7 @@ extension SchemaV1.NightEventRecord {
             origin: EventOrigin(rawValue: originRaw) ?? .detected,
             isSomeoneElse: isSomeoneElse,
             isFavorite: isFavorite,
+            label: label,
             clipPath: clipPath
         )
     }
@@ -332,6 +335,7 @@ extension SchemaV1.NightEventRecord {
         originRaw = event.origin.rawValue
         isSomeoneElse = event.isSomeoneElse
         isFavorite = event.isFavorite
+        label = event.label
         clipPath = event.clipPath
     }
 }

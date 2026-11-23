@@ -13,7 +13,7 @@ struct NightEventRepositoryTests {
         let other = UUID()
         let start = Date(timeIntervalSince1970: 1_795_300_000)
         let snore = NightEvent(sessionID: night, kind: .snoring, start: start.addingTimeInterval(600), duration: 130, confidence: 0.92, intensity: 14)
-        let speech = NightEvent(sessionID: night, kind: .speech, start: start.addingTimeInterval(60), duration: 6, confidence: 0.6, intensity: 9, clipPath: "Recordings/x/extrait-001.m4a")
+        let speech = NightEvent(sessionID: night, kind: .speech, start: start.addingTimeInterval(60), duration: 6, confidence: 0.6, intensity: 9, label: "whispering", clipPath: "Recordings/x/extrait-001.m4a")
         try await repository.save([snore, speech, NightEvent(sessionID: other, kind: .cough, start: start, duration: 2, confidence: 0.8, intensity: 11)])
 
         #expect(try await repository.events(sessionID: night).map(\.kind) == [.speech, .snoring])
@@ -25,6 +25,7 @@ struct NightEventRepositoryTests {
         #expect(reread.last?.detectedKind == .snoring)
         #expect(reread.last?.origin == .reclassified)
         #expect(reread.first?.clipPath == "Recordings/x/extrait-001.m4a")
+        #expect(reread.first?.label == "whispering")
 
         let window = DateInterval(start: start.addingTimeInterval(30), end: start.addingTimeInterval(700))
         #expect(try await repository.events(in: window).count == 2)

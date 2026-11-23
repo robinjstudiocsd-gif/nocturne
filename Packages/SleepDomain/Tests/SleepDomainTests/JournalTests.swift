@@ -218,6 +218,13 @@ struct NightEventTests {
         #expect(ConfidenceLevel(0.2) == .low)
         #expect(event.end == date(22, 3, 14).addingTimeInterval(10))
         #expect(EventKind.snoring.mergeGap == 30)
+        #expect(event.outsideNoise == nil)
+        #expect(OutsideNoise(label: "dog_bark") == .dog)
+        #expect(OutsideNoise(label: "car_passing_by") == .traffic)
+        #expect(OutsideNoise(label: "police_siren") == .siren)
+        #expect(OutsideNoise(label: "door_slam") == .door)
+        #expect(OutsideNoise(label: nil) == .other)
+        #expect(OutsideNoise.traffic.title == "Circulation")
     }
 }
 

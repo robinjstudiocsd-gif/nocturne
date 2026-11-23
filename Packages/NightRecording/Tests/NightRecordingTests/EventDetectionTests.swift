@@ -68,6 +68,15 @@ struct EventDetectionTests {
         #expect(snore.intensity == 15)
         #expect(snore.sessionID == session)
 
+        // L'étiquette retenue est celle de la détection la plus sûre.
+        var labelled = EventAggregator(sessionID: session)
+        _ = labelled.add(SoundDetection(time: start, kind: .external, confidence: 0.6, intensity: 5, label: "car_passing_by"))
+        _ = labelled.add(SoundDetection(time: start.addingTimeInterval(2), kind: .external, confidence: 0.9, intensity: 7, label: "siren"))
+        _ = labelled.add(SoundDetection(time: start.addingTimeInterval(4), kind: .external, confidence: 0.7, intensity: 6, label: "engine"))
+        let outside = labelled.flush()
+        #expect(outside.first?.label == "siren")
+        #expect(outside.first?.outsideNoise == .siren)
+
         let last = aggregator.flush()
         #expect(last.count == 1)
         #expect(last.first?.start == start.addingTimeInterval(200))

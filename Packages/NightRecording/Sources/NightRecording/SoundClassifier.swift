@@ -177,7 +177,8 @@ private final class ResultsObserver: NSObject, SNResultsObserving, @unchecked Se
             kind: kind,
             confidence: best.confidence,
             intensity: 0,
-            duration: duration.isFinite ? max(0.5, duration) : 1
+            duration: duration.isFinite ? max(0.5, duration) : 1,
+            label: best.identifier
         ))
     }
 

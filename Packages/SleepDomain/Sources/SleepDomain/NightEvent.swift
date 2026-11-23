@@ -106,6 +106,8 @@ public struct NightEvent: Identifiable, Hashable, Codable, Sendable {
     public var isSomeoneElse: Bool
     /// Favori : le passage est protégé du nettoyage automatique.
     public var isFavorite: Bool
+    /// Étiquette précise du classifieur d'Apple (« dog_bark », « door »…), si elle est connue.
+    public var label: String?
     /// Extrait audio gardé autour de l'événement, s'il y en a un.
     public var clipPath: String?
 
@@ -121,6 +123,7 @@ public struct NightEvent: Identifiable, Hashable, Codable, Sendable {
         origin: EventOrigin = .detected,
         isSomeoneElse: Bool = false,
         isFavorite: Bool = false,
+        label: String? = nil,
         clipPath: String? = nil
     ) {
         self.id = id
@@ -134,6 +137,7 @@ public struct NightEvent: Identifiable, Hashable, Codable, Sendable {
         self.origin = origin
         self.isSomeoneElse = isSomeoneElse
         self.isFavorite = isFavorite
+        self.label = label
         self.clipPath = clipPath
     }
 
@@ -145,12 +149,86 @@ public struct NightEvent: Identifiable, Hashable, Codable, Sendable {
         ConfidenceLevel(confidence)
     }
 
+    /// Famille d'un bruit extérieur (circulation, chien, porte…), d'après l'étiquette.
+    public var outsideNoise: OutsideNoise? {
+        guard kind == .external else { return nil }
+        return OutsideNoise(label: label)
+    }
+
     /// Correction par l'utilisateur : le type d'origine reste connu.
     public func reclassified(as newKind: EventKind) -> NightEvent {
         var copy = self
         copy.kind = newKind
         copy.origin = newKind == detectedKind ? .confirmed : .reclassified
         return copy
+    }
+}
+
+/// Familles de bruits extérieurs, pour l'ambiance de la chambre.
+public enum OutsideNoise: String, CaseIterable, Sendable {
+    case traffic
+    case siren
+    case transport
+    case dog
+    case animal
+    case door
+    case ringing
+    case weather
+    case water
+    case media
+    case baby
+    case household
+    case other
+
+    public var title: String {
+        switch self {
+        case .traffic: "Circulation"
+        case .siren: "Sirène"
+        case .transport: "Train ou avion"
+        case .dog: "Chien"
+        case .animal: "Autre animal"
+        case .door: "Porte"
+        case .ringing: "Sonnerie"
+        case .weather: "Pluie, orage ou vent"
+        case .water: "Eau"
+        case .media: "Musique ou télé"
+        case .baby: "Bébé"
+        case .household: "Bruit de la maison"
+        case .other: "Autre bruit"
+        }
+    }
+
+    /// Range une étiquette du classifieur d'Apple dans sa famille.
+    public init(label: String?) {
+        let value = (label ?? "").lowercased()
+        func has(_ words: String...) -> Bool { words.contains { value.contains($0) } }
+        if has("siren") {
+            self = .siren
+        } else if has("car", "traffic", "engine", "truck", "bus", "motorcycle", "vehicle", "horn") {
+            self = .traffic
+        } else if has("train", "aircraft", "airplane", "helicopter", "subway") {
+            self = .transport
+        } else if has("dog", "bark", "howl") {
+            self = .dog
+        } else if has("cat", "bird", "rooster", "crow", "owl", "insect", "cricket") {
+            self = .animal
+        } else if has("door", "knock") {
+            self = .door
+        } else if has("telephone", "bell", "alarm", "ring") {
+            self = .ringing
+        } else if has("rain", "thunder", "wind", "storm") {
+            self = .weather
+        } else if has("water", "toilet", "sink", "drip") {
+            self = .water
+        } else if has("music", "television", "radio", "singing") {
+            self = .media
+        } else if has("baby") {
+            self = .baby
+        } else if has("footsteps", "dishes", "glass", "keys", "drawer", "chair") {
+            self = .household
+        } else {
+            self = .other
+        }
     }
 }
 

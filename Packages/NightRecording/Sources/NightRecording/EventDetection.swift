@@ -109,13 +109,16 @@ public struct SoundDetection: Equatable, Sendable {
     /// Écart au bruit de fond, en décibels.
     public var intensity: Double
     public var duration: TimeInterval
+    /// Étiquette précise du classifieur (« dog_bark »…).
+    public var label: String?
 
-    public init(time: Date, kind: EventKind, confidence: Double, intensity: Double, duration: TimeInterval = 1) {
+    public init(time: Date, kind: EventKind, confidence: Double, intensity: Double, duration: TimeInterval = 1, label: String? = nil) {
         self.time = time
         self.kind = kind
         self.confidence = confidence
         self.intensity = intensity
         self.duration = duration
+        self.label = label
     }
 }
 
@@ -134,7 +137,10 @@ public struct EventAggregator: Sendable {
         if var current = open[detection.kind], detection.time.timeIntervalSince(current.end) <= detection.kind.mergeGap {
             let end = max(current.end, detection.time.addingTimeInterval(detection.duration))
             current.duration = end.timeIntervalSince(current.start)
-            current.confidence = max(current.confidence, detection.confidence)
+            if detection.confidence > current.confidence {
+                current.confidence = detection.confidence
+                current.label = detection.label ?? current.label
+            }
             current.intensity = max(current.intensity, detection.intensity)
             open[detection.kind] = current
         } else {
@@ -147,7 +153,8 @@ public struct EventAggregator: Sendable {
                 start: detection.time,
                 duration: detection.duration,
                 confidence: detection.confidence,
-                intensity: detection.intensity
+                intensity: detection.intensity,
+                label: detection.label
             )
         }
         return closed.sorted { $0.start < $1.start }
