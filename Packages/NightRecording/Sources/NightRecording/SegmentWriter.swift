@@ -103,3 +103,16 @@ public enum RecordingError: Error, Equatable, Sendable {
     case microphoneUnavailable
     case permissionDenied
 }
+
+extension RecordingError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .unsupportedFormat:
+            return "Le format audio du micro n’est pas pris en charge."
+        case .microphoneUnavailable:
+            return "Le micro n’est pas disponible pour l’instant."
+        case .permissionDenied:
+            return "Le micro est refusé : autorise-le dans Réglages, puis Nocturne, ou choisis le mode Coupé."
+        }
+    }
+}

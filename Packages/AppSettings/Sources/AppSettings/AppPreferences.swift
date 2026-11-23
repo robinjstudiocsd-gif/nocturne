@@ -8,12 +8,6 @@ public enum Appearance: String, CaseIterable, Sendable {
     case dark
 }
 
-/// Éclairage de l'écran de nuit.
-public enum NightLighting: String, CaseIterable, Sendable {
-    case dark
-    case red
-}
-
 /// Préférences typées, avec leurs valeurs par défaut, rangées dans UserDefaults.
 public final class AppPreferences: @unchecked Sendable {
     public enum Key {
@@ -22,6 +16,11 @@ public final class AppPreferences: @unchecked Sendable {
         static let audioRetentionNights = "preferences.audioRetentionNights"
         static let nightLighting = "preferences.nightLighting"
         static let sleepNeedMinutes = "preferences.sleepNeedMinutes"
+        static let alarmEnabled = "preferences.alarm.enabled"
+        static let alarmHour = "preferences.alarm.hour"
+        static let alarmMinute = "preferences.alarm.minute"
+        static let smartWake = "preferences.alarm.smartWake"
+        static let napMinutes = "preferences.nap.minutes"
     }
 
     /// Valeurs par défaut validées dans l'étude.
@@ -67,5 +66,32 @@ public final class AppPreferences: @unchecked Sendable {
             return min(720, max(240, stored))
         }
         set { defaults.set(min(720, max(240, newValue)), forKey: Key.sleepNeedMinutes) }
+    }
+}
+
+extension AppPreferences: NightPreferencesStore {
+    /// Réglages de « Préparer ma nuit » gardés d'un soir à l'autre ; le type de session repart toujours sur une nuit.
+    public var nightPlan: NightPlan {
+        get {
+            let base = NightPlan()
+            return NightPlan(
+                kind: .night,
+                mode: recordingMode,
+                alarmEnabled: defaults.object(forKey: Key.alarmEnabled) as? Bool ?? base.alarmEnabled,
+                alarmHour: defaults.object(forKey: Key.alarmHour) as? Int ?? base.alarmHour,
+                alarmMinute: defaults.object(forKey: Key.alarmMinute) as? Int ?? base.alarmMinute,
+                smartWake: defaults.object(forKey: Key.smartWake) as? Bool ?? base.smartWake,
+                smartWindowMinutes: base.smartWindowMinutes,
+                napMinutes: defaults.object(forKey: Key.napMinutes) as? Int ?? base.napMinutes
+            )
+        }
+        set {
+            recordingMode = newValue.mode
+            defaults.set(newValue.alarmEnabled, forKey: Key.alarmEnabled)
+            defaults.set(newValue.alarmHour, forKey: Key.alarmHour)
+            defaults.set(newValue.alarmMinute, forKey: Key.alarmMinute)
+            defaults.set(newValue.smartWake, forKey: Key.smartWake)
+            defaults.set(newValue.napMinutes, forKey: Key.napMinutes)
+        }
     }
 }

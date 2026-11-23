@@ -7,12 +7,15 @@ public struct Checkpoint: Codable, Equatable, Sendable {
     public var lastBeat: Date
     public var nextSegmentIndex: Int
     public var levelSeconds: Int
+    /// Réveil prévu, retrouvé si l'app est relancée pendant la nuit.
+    public var alarm: NightAlarm?
 
-    public init(sessionID: UUID, lastBeat: Date, nextSegmentIndex: Int, levelSeconds: Int) {
+    public init(sessionID: UUID, lastBeat: Date, nextSegmentIndex: Int, levelSeconds: Int, alarm: NightAlarm? = nil) {
         self.sessionID = sessionID
         self.lastBeat = lastBeat
         self.nextSegmentIndex = nextSegmentIndex
         self.levelSeconds = levelSeconds
+        self.alarm = alarm
     }
 }
 

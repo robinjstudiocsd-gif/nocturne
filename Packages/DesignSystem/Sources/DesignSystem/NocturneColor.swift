@@ -9,10 +9,25 @@ public enum NocturneColor {
     public static let separator = Color(hex: 0x2B386E)
     public static let tabBar = Color(hex: 0x0E1430)
 
+    /// Choix actif d'un sélecteur à segments.
+    public static let segmentSelected = Color(hex: 0x3A4A8C)
+    /// Choix actif parmi les visages d'humeur.
+    public static let moodSelected = Color(hex: 0x3A3586)
+    /// Filet au-dessus des barres fixées en bas d'écran.
+    public static let hairline = Color(hex: 0x1B2450)
+    /// Interrupteur activé.
+    public static let switchOn = Color(hex: 0x34C77B)
+
     // Textes
     public static let textPrimary = Color(hex: 0xF3F4FA)
     public static let textSecondary = Color(hex: 0xA9B1D6)
     public static let textTertiary = Color(hex: 0x949DC8)
+    /// Texte des puces non choisies.
+    public static let textSoft = Color(hex: 0xD3D7EE)
+    /// Texte d'exemple des champs vides.
+    public static let placeholder = Color(hex: 0x8E97C4)
+    /// Chevron des lignes qui ouvrent un écran.
+    public static let chevron = Color(hex: 0x6F7AB0)
 
     // Accents
     public static let violet = Color(hex: 0x6E5BD6)

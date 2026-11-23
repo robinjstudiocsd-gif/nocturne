@@ -33,6 +33,25 @@ struct AppPreferencesTests {
         #expect(preferences.audioRetentionNights == 365)
         #expect(preferences.nightLighting == .red)
     }
+
+    @Test("Réglages de la nuit gardés d'un soir à l'autre, sauf le type de session")
+    func nightPlan() {
+        let defaults = freshDefaults()
+        let preferences = AppPreferences(defaults: defaults)
+        #expect(preferences.nightPlan == NightPlan())
+
+        preferences.nightPlan = NightPlan(kind: .nap, mode: .off, alarmEnabled: false, alarmHour: 6, alarmMinute: 45, smartWake: false, napMinutes: 20)
+
+        let reloaded = AppPreferences(defaults: defaults).nightPlan
+        #expect(reloaded.kind == .night)
+        #expect(reloaded.mode == .off)
+        #expect(reloaded.alarmEnabled == false)
+        #expect(reloaded.alarmHour == 6)
+        #expect(reloaded.alarmMinute == 45)
+        #expect(reloaded.smartWake == false)
+        #expect(reloaded.napMinutes == 20)
+        #expect(preferences.recordingMode == .off)
+    }
 }
 
 @Suite("Signature")

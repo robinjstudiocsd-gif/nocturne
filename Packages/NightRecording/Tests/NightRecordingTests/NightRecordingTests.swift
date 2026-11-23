@@ -128,6 +128,25 @@ struct SegmentTests {
         #expect(store.read() == nil)
     }
 
+    @Test("Point de reprise : le réveil prévu est gardé, un ancien fichier sans réveil se relit")
+    func checkpointAlarm() throws {
+        let folder = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = CheckpointStore(fileURL: folder.appendingPathComponent("reprise.json"))
+        let wake = Date(timeIntervalSince1970: 1_795_330_000)
+        let alarm = NightAlarm(date: wake, smartWindowStart: wake.addingTimeInterval(-1_800))
+        let checkpoint = Checkpoint(sessionID: UUID(), lastBeat: Date(timeIntervalSince1970: 1_795_300_000), nextSegmentIndex: 2, levelSeconds: 600, alarm: alarm)
+
+        try store.write(checkpoint)
+        #expect(store.read()?.alarm == alarm)
+
+        let old = #"{"sessionID":"5B1A7E2C-3F41-4B8E-9C2D-1A2B3C4D5E6F","lastBeat":800000000,"nextSegmentIndex":3,"levelSeconds":900}"#
+        try Data(old.utf8).write(to: store.fileURL)
+        let reread = try #require(store.read())
+        #expect(reread.alarm == nil)
+        #expect(reread.nextSegmentIndex == 3)
+    }
+
     @Test("Reprise : trou noté depuis le dernier battement, nuit trop ancienne terminée")
     func recovery() {
         let start = Date(timeIntervalSince1970: 1_795_300_000)

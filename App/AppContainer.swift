@@ -1,5 +1,6 @@
 import AppSettings
 import Foundation
+import NightFeature
 import NightRecording
 import Persistence
 import SettingsFeature
@@ -9,6 +10,9 @@ import SwiftData
 /// Assemblage des dépendances : la seule partie de l'app qui connaît les vrais services.
 @MainActor
 final class AppContainer {
+    /// Qualité de l'audio enregistré (étude : 32 kbit/s à 24 kHz par défaut).
+    static let audioQuality = AudioQuality.standard
+
     let modelContainer: ModelContainer
     let sessions: any SleepSessionRepository
     let recordings: any RecordingRepository
@@ -19,21 +23,36 @@ final class AppContainer {
     let preferences: AppPreferences
     let signing: SigningStatus
     let renewals: RenewalTracker
+    let preflight: DevicePreflight
 
     init(modelContainer: ModelContainer, journal: any DiagnosticJournal, defaults: UserDefaults, bundleURL: URL, storage: RecordingStorage) {
         let sessions = SwiftDataSleepSessionRepository(container: modelContainer)
         let recordings = SwiftDataRecordingRepository(container: modelContainer)
         let lifecycle = SessionLifecycle(repository: sessions)
+        let signing = SigningStatus.read(bundleURL: bundleURL)
         self.modelContainer = modelContainer
         self.sessions = sessions
         self.recordings = recordings
         self.eveningLogs = SwiftDataEveningLogRepository(container: modelContainer)
         self.lifecycle = lifecycle
-        self.night = NightSessionController(lifecycle: lifecycle, recordings: recordings, storage: storage, journal: journal, quality: .standard)
+        self.night = NightSessionController(lifecycle: lifecycle, recordings: recordings, storage: storage, journal: journal, quality: AppContainer.audioQuality)
         self.journal = journal
         self.preferences = AppPreferences(defaults: defaults)
-        self.signing = SigningStatus.read(bundleURL: bundleURL)
+        self.signing = signing
         self.renewals = RenewalTracker(defaults: defaults)
+        self.preflight = DevicePreflight(storage: storage, signatureExpiry: signing.expirationDate)
+    }
+
+    /// Modèle de vue de l'onglet Nuit, partagé par l'écran de préparation et l'écran de nuit.
+    func makeNightModel() -> NightViewModel {
+        NightViewModel(
+            service: night,
+            preflight: preflight,
+            preferences: preferences,
+            lifecycle: lifecycle,
+            eveningLogs: eveningLogs,
+            quality: AppContainer.audioQuality
+        )
     }
 
     /// Les vrais services, sur disque.

@@ -21,11 +21,13 @@ struct RootView: View {
     @State private var selection: AppTab = .home
     @State private var showsSettings = false
     @State private var journalModel: JournalViewModel
+    @State private var nightModel: NightViewModel
     @Environment(\.scenePhase) private var scenePhase
 
     init(container: AppContainer) {
         self.container = container
         _journalModel = State(initialValue: JournalViewModel(repository: container.sessions))
+        _nightModel = State(initialValue: container.makeNightModel())
     }
 
     var body: some View {
@@ -45,7 +47,7 @@ struct RootView: View {
             }
             Tab("Nuit", systemImage: "moon", value: AppTab.night) {
                 NavigationStack {
-                    PrepareNightView()
+                    PrepareNightView(model: nightModel)
                 }
             }
             Tab("Statistiques", systemImage: "chart.bar", value: AppTab.statistics) {
@@ -72,6 +74,15 @@ struct RootView: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: nightCoverBinding) {
+            NightFlowView(model: nightModel) {
+                selection = .home
+                Task { await journalModel.load() }
+            }
+        }
+        .task {
+            await nightModel.observe()
+        }
         .task {
             await container.night.recoverIfNeeded()
         }
@@ -82,5 +93,10 @@ struct RootView: View {
             default: break
             }
         }
+    }
+
+    /// L'écran de nuit recouvre l'app tant qu'une session tourne, puis jusqu'à la fin de « Bonjour ».
+    private var nightCoverBinding: Binding<Bool> {
+        Binding(get: { nightModel.isCoverPresented }, set: { _ in })
     }
 }

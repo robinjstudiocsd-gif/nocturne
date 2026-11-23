@@ -144,12 +144,7 @@ public typealias RecordingGapRecord = SchemaV1.RecordingGapRecord
 extension SchemaV1.SleepSessionRecord {
     /// La session du domaine correspondant à cet enregistrement.
     var session: SleepSession {
-        let feeling: WakeFeeling?
-        if let mood, let energy {
-            feeling = WakeFeeling(mood: mood, energy: energy)
-        } else {
-            feeling = nil
-        }
+        let feeling: WakeFeeling? = (mood == nil && energy == nil) ? nil : WakeFeeling(mood: mood, energy: energy)
         return SleepSession(
             id: id,
             kind: SessionKind(rawValue: kindRaw) ?? .night,

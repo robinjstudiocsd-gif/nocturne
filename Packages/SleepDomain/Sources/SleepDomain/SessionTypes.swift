@@ -65,14 +65,19 @@ public struct SessionTimes: Hashable, Codable, Sendable {
     }
 }
 
-/// Ressenti au réveil, de 1 à 5.
+/// Ressenti au réveil, de 1 à 5. L'humeur ou l'énergie peut rester vide.
 public struct WakeFeeling: Hashable, Codable, Sendable {
-    public var mood: Int
-    public var energy: Int
+    public var mood: Int?
+    public var energy: Int?
 
-    public init(mood: Int, energy: Int) {
-        self.mood = min(5, max(1, mood))
-        self.energy = min(5, max(1, energy))
+    public init(mood: Int?, energy: Int?) {
+        self.mood = mood.map { min(5, max(1, $0)) }
+        self.energy = energy.map { min(5, max(1, $0)) }
+    }
+
+    /// Vrai si rien n'a été choisi.
+    public var isEmpty: Bool {
+        mood == nil && energy == nil
     }
 }
 

@@ -7,6 +7,22 @@ public enum SessionError: Error, Equatable, Sendable {
     case invalidTimes([SessionIssue])
 }
 
+extension SessionError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .notFound:
+            return "Cette nuit n’existe plus."
+        case .notRunning:
+            return "Cette nuit est déjà terminée."
+        case .invalidTimes(let issues):
+            if issues.contains(.timesOutOfOrder) {
+                return "Les horaires doivent se suivre : coucher, endormissement, réveil, puis lever."
+            }
+            return "Une nuit ne peut pas durer plus de 24 heures."
+        }
+    }
+}
+
 /// Cas d'usage d'une session sans audio (lot 1) : démarrer, arrêter, saisir, corriger.
 /// L'écoute de la nuit s'y branchera au lot 2.
 public struct SessionLifecycle: Sendable {
@@ -91,6 +107,19 @@ public struct SessionLifecycle: Sendable {
         session.corrected = corrected
         session.wakeEpisodes = wakeEpisodes.sorted { $0.start < $1.start }
         session.kind = kind
+        session.comment = comment?.trimmedOrNil
+        let issues = session.issues
+        guard issues.isEmpty else { throw SessionError.invalidTimes(issues) }
+        try await repository.save(session)
+        return session
+    }
+
+    /// Écran « Bonjour » : ressenti, horaires corrigés et commentaire, enregistrés ensemble après vérification.
+    @discardableResult
+    public func saveMorning(id: UUID, feeling: WakeFeeling?, corrected: SessionTimes, comment: String?) async throws -> SleepSession {
+        guard var session = try await repository.session(id: id) else { throw SessionError.notFound }
+        session.corrected = corrected
+        session.feeling = feeling?.isEmpty == false ? feeling : nil
         session.comment = comment?.trimmedOrNil
         let issues = session.issues
         guard issues.isEmpty else { throw SessionError.invalidTimes(issues) }

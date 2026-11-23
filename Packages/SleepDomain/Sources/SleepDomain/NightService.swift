@@ -1,5 +1,16 @@
 import Foundation
 
+/// Coupure de l'écoute encore en cours : depuis quand, et pourquoi.
+public struct ListeningCut: Equatable, Sendable {
+    public var start: Date
+    public var cause: RecordingGap.Cause
+
+    public init(start: Date, cause: RecordingGap.Cause) {
+        self.start = start
+        self.cause = cause
+    }
+}
+
 /// État de l'écoute de la nuit, tel que l'interface l'affiche.
 public struct NightStatus: Equatable, Sendable {
     public var session: SleepSession?
@@ -10,7 +21,11 @@ public struct NightStatus: Equatable, Sendable {
     public var currentLevelDb: Float?
     /// Vrai quand l'écoute est coupée et que la reprise automatique a échoué.
     public var needsResume: Bool
+    /// Trous terminés de la nuit.
     public var gaps: [RecordingGap]
+    /// Coupure en cours, pas encore refermée.
+    public var cut: ListeningCut?
+    public var alarm: NightAlarm?
     public var liveActivityEnabled: Bool
 
     public init(
@@ -22,6 +37,8 @@ public struct NightStatus: Equatable, Sendable {
         currentLevelDb: Float? = nil,
         needsResume: Bool = false,
         gaps: [RecordingGap] = [],
+        cut: ListeningCut? = nil,
+        alarm: NightAlarm? = nil,
         liveActivityEnabled: Bool = false
     ) {
         self.session = session
@@ -32,6 +49,8 @@ public struct NightStatus: Equatable, Sendable {
         self.currentLevelDb = currentLevelDb
         self.needsResume = needsResume
         self.gaps = gaps
+        self.cut = cut
+        self.alarm = alarm
         self.liveActivityEnabled = liveActivityEnabled
     }
 
@@ -40,11 +59,23 @@ public struct NightStatus: Equatable, Sendable {
     public var isRunning: Bool {
         session?.state == .running
     }
+
+    /// Temps réellement écouté : du début de la session à `now` (ou à son arrêt), moins les trous et la coupure en cours.
+    public func listenedDuration(until now: Date) -> TimeInterval {
+        guard mode != .off, let session, let start = session.detected.bedtime else { return 0 }
+        let end = session.state == .running ? now : (session.detected.wake ?? now)
+        guard end > start else { return 0 }
+        let missing = gaps.reduce(0) { total, gap in
+            total + max(0, min(gap.end, end).timeIntervalSince(max(gap.start, start)))
+        }
+        let ongoing = cut.map { max(0, end.timeIntervalSince(max($0.start, start))) } ?? 0
+        return max(0, end.timeIntervalSince(start) - missing - ongoing)
+    }
 }
 
 /// Service de la nuit : démarrer, arrêter, reprendre l'écoute.
 public protocol NightRecordingService: Sendable {
-    func start(kind: SessionKind, mode: RecordingMode, alarm: Date?) async throws -> SleepSession
+    func start(kind: SessionKind, mode: RecordingMode, alarm: NightAlarm?) async throws -> SleepSession
     @discardableResult
     func stop() async throws -> SleepSession?
     func resume() async

@@ -23,8 +23,10 @@ public final class NightSessionController: NightRecordingService {
     private var heartbeat: Task<Void, Never>?
     private var beats = 0
     private var tapInstalled = false
-    private var alarm: Date?
-    private var pendingGap: (start: Date, cause: RecordingGap.Cause)?
+    private var alarm: NightAlarm?
+    private var pendingGap: (start: Date, cause: RecordingGap.Cause)? {
+        didSet { status.cut = pendingGap.map { ListeningCut(start: $0.start, cause: $0.cause) } }
+    }
     private var continuations: [UUID: AsyncStream<NightStatus>.Continuation] = [:]
     private var status = NightStatus.idle {
         didSet { broadcast() }
@@ -47,7 +49,7 @@ public final class NightSessionController: NightRecordingService {
 
     // MARK: - Service
 
-    public func start(kind: SessionKind, mode: RecordingMode, alarm: Date?) async throws -> SleepSession {
+    public func start(kind: SessionKind, mode: RecordingMode, alarm: NightAlarm?) async throws -> SleepSession {
         if let running = try await lifecycle.running() {
             return running
         }
@@ -56,7 +58,7 @@ public final class NightSessionController: NightRecordingService {
         }
         let session = try await lifecycle.start(kind: kind, mode: mode)
         self.alarm = alarm
-        status = NightStatus(session: session, mode: mode)
+        status = NightStatus(session: session, mode: mode, alarm: alarm)
         if mode != .off {
             do {
                 try startListening(session: session, mode: mode, resume: nil)
@@ -65,7 +67,8 @@ public final class NightSessionController: NightRecordingService {
                 journal.record("Écoute impossible au démarrage : \(error.localizedDescription)")
             }
         }
-        status.liveActivityEnabled = liveActivity.start(session: session, alarm: alarm)
+        status.liveActivityEnabled = liveActivity.start(session: session, alarm: alarm?.date)
+        writeCheckpoint(sessionID: session.id)
         startHeartbeat(sessionID: session.id)
         UIDevice.current.isBatteryMonitoringEnabled = true
         journal.record("Nuit démarrée · mode \(mode.rawValue) · batterie \(NightSessionController.batteryText()) · volume \(Int((AVAudioSession.sharedInstance().outputVolume * 100).rounded())) %")
@@ -85,6 +88,7 @@ public final class NightSessionController: NightRecordingService {
         checkpoints.clear()
         let finished = try await lifecycle.stop(id: session.id)
         journal.record("Nuit arrêtée · \(status.segmentCount) tranches · batterie \(NightSessionController.batteryText())")
+        alarm = nil
         status = NightStatus(
             session: finished,
             mode: status.mode,
@@ -135,10 +139,14 @@ public final class NightSessionController: NightRecordingService {
 
     public func recoverIfNeeded() async {
         let running = try? await lifecycle.running()
-        switch RecoveryPlanner.plan(checkpoint: checkpoints.read(), running: running, now: Date()) {
+        let checkpoint = checkpoints.read()
+        if let running, checkpoint?.sessionID == running.id {
+            alarm = checkpoint?.alarm
+        }
+        switch RecoveryPlanner.plan(checkpoint: checkpoint, running: running, now: Date()) {
         case .nothing:
             if let running {
-                status = NightStatus(session: running, mode: running.recordingMode)
+                status = NightStatus(session: running, mode: running.recordingMode, alarm: alarm)
             } else {
                 checkpoints.clear()
                 liveActivity.endStale()
@@ -146,7 +154,7 @@ public final class NightSessionController: NightRecordingService {
         case .resume(let gap):
             guard let running else { return }
             try? await recordings.save(gap)
-            status = NightStatus(session: running, mode: running.recordingMode, gaps: [gap])
+            status = NightStatus(session: running, mode: running.recordingMode, gaps: [gap], alarm: alarm)
             journal.record("Nuit reprise après une fermeture de l'app · trou de \(Int(gap.duration / 60)) min")
             if running.recordingMode != .off {
                 do {
@@ -157,13 +165,15 @@ public final class NightSessionController: NightRecordingService {
                 }
             }
             liveActivity.endStale()
-            status.liveActivityEnabled = liveActivity.start(session: running, alarm: nil)
+            status.liveActivityEnabled = liveActivity.start(session: running, alarm: alarm?.date)
+            writeCheckpoint(sessionID: running.id)
             startHeartbeat(sessionID: running.id)
         case .close(let end, let gap):
             guard let running else { return }
             try? await recordings.save(gap)
             let closed = try? await lifecycle.close(id: running.id, at: end)
             checkpoints.clear()
+            alarm = nil
             liveActivity.endStale()
             journal.record("Nuit interrompue, terminée à la dernière minute connue")
             status = NightStatus(session: closed, mode: running.recordingMode, gaps: [gap])
@@ -293,13 +303,7 @@ public final class NightSessionController: NightRecordingService {
 
     private func beat(sessionID: UUID) async {
         beats += 1
-        let checkpoint = Checkpoint(
-            sessionID: sessionID,
-            lastBeat: Date(),
-            nextSegmentIndex: pipeline?.nextSegmentIndex ?? 1,
-            levelSeconds: pipeline?.nextLevelSecond ?? 0
-        )
-        try? checkpoints.write(checkpoint)
+        writeCheckpoint(sessionID: sessionID)
         if beats % 30 == 0 {
             journal.record("Toujours à l'écoute · \(status.segmentCount) tranches · batterie \(NightSessionController.batteryText())")
         }
@@ -309,6 +313,18 @@ public final class NightSessionController: NightRecordingService {
             journal.record("L'écoute s'est arrêtée sans prévenir")
             await resume()
         }
+    }
+
+    /// Point de reprise : dernière minute connue, rangs de reprise et réveil prévu.
+    private func writeCheckpoint(sessionID: UUID) {
+        let checkpoint = Checkpoint(
+            sessionID: sessionID,
+            lastBeat: Date(),
+            nextSegmentIndex: pipeline?.nextSegmentIndex ?? 1,
+            levelSeconds: pipeline?.nextLevelSecond ?? 0,
+            alarm: alarm
+        )
+        try? checkpoints.write(checkpoint)
     }
 
     private func broadcast() {
