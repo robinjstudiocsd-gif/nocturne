@@ -70,9 +70,9 @@ struct NightAnalyzerTests {
 
         #expect(input.peaks.count == 3_600)
         #expect(input.peaks[29] == nil)
-        #expect(input.peaks[30] == -59)
+        #expect(input.peaks[30] == Float(-59))
         #expect(input.motion.count == 120)
-        #expect(NightAnalyzer.align([1, 2, 3], offset: -1) == [2, 3])
+        #expect(NightAnalyzer.align([1, 2, 3], offset: -1) == [Float?]([2, 3]))
     }
 
     @Test("Déverrouillages : gardés seulement si iOS a signalé un verrouillage ; le dernier se ferme à l'arrêt")

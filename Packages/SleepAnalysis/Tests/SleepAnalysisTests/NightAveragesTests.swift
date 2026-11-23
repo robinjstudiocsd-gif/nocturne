@@ -36,8 +36,8 @@ struct NightAveragesTests {
         let averages = NightAverages(sessions: previousNights(), calendar: paris)
 
         #expect(averages.nights == 3)
-        #expect(averages.asleep == 460 * 60)
-        #expect(averages.latency == 15 * 60)
+        #expect(averages.asleep == TimeInterval(460 * 60))
+        #expect(averages.latency == TimeInterval(15 * 60))
         #expect(abs((averages.wakeCount ?? 0) - 1.0 / 3.0) < 0.0001)
         #expect(averages.bedtime == ClockTime(hour: 23, minute: 0))
         #expect(averages.wake == ClockTime(hour: 6, minute: 58))
@@ -53,8 +53,8 @@ struct NightAveragesTests {
         let comparison = NightComparison(session: tonight, previous: averages, calendar: paris)
 
         #expect(comparison.referenceNights == 3)
-        #expect(comparison.asleep == -55 * 60)
-        #expect(comparison.bedtime == 90 * 60)
+        #expect(comparison.asleep == TimeInterval(-55 * 60))
+        #expect(comparison.bedtime == TimeInterval(90 * 60))
         #expect(abs((comparison.wake ?? 0) - 1_900) < 1)
         #expect(abs((comparison.wakeCount ?? 0) + 1.0 / 3.0) < 0.0001)
     }
@@ -72,7 +72,7 @@ struct NightAveragesTests {
         #expect(report.previousNights == 3)
         // Chaque nuit précédente n'a que 60 points de critères : 100, arrondi à 5.
         #expect(report.averageScore == 100)
-        #expect(report.comparison.asleep == -55 * 60)
+        #expect(report.comparison.asleep == TimeInterval(-55 * 60))
         #expect(NightReporter.previousNights(of: tonight, among: previousNights()).map(\.times.bedtime) == [at(20, 22, 30), at(19, 23, 30), at(18, 23, 0)])
     }
 
