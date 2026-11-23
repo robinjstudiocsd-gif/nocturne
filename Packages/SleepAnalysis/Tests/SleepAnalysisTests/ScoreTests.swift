@@ -53,8 +53,8 @@ struct ScoreTests {
 
         let notes = Dictionary(uniqueKeysWithValues: score.criteria.map { ($0.criterion, $0.note) })
         #expect(notes[.duration] == 0.5)
-        #expect(abs((notes[.continuity] ?? 0) - 11.0 / 12.0) < 0.0001)
-        #expect(abs((notes[.awakenings] ?? 0) - 1.0 / 3.0) < 0.0001)
+        #expect(abs(((notes[.continuity] ?? nil) ?? 0) - 11.0 / 12.0) < 0.0001)
+        #expect(abs(((notes[.awakenings] ?? nil) ?? 0) - 1.0 / 3.0) < 0.0001)
         #expect(notes[.regularity] == 1)
         #expect(notes[.goals] == 0.75)
         #expect(notes[.stages] == .some(nil))
