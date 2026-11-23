@@ -23,13 +23,12 @@ struct EventDetectionTests {
     @Test("Déclenchement : au-dessus du seuil, quelques secondes après, et une seconde par minute")
     func trigger() {
         var trigger = DetectionTrigger(threshold: 10, holdSeconds: 3)
-        #expect(trigger.shouldAnalyze(second: 0, level: -60, floor: -60))
-        #expect(!trigger.shouldAnalyze(second: 1, level: -58, floor: -60))
-        #expect(trigger.shouldAnalyze(second: 10, level: -45, floor: -60))
-        #expect(trigger.shouldAnalyze(second: 13, level: -60, floor: -60))
-        #expect(!trigger.shouldAnalyze(second: 14, level: -60, floor: -60))
-        #expect(!trigger.shouldAnalyze(second: 72, level: -60, floor: -60))
-        #expect(trigger.shouldAnalyze(second: 73, level: -60, floor: -60))
+        let steps: [(second: Int, level: Float)] = [(0, -60), (1, -58), (10, -45), (13, -60), (14, -60), (72, -60), (73, -60)]
+        var answers: [Bool] = []
+        for step in steps {
+            answers.append(trigger.shouldAnalyze(second: step.second, level: step.level, floor: -60))
+        }
+        #expect(answers == [true, false, true, true, false, false, true])
     }
 
     @Test("Étiquettes d'Apple regroupées en types")
@@ -72,6 +71,7 @@ struct EventDetectionTests {
         let last = aggregator.flush()
         #expect(last.count == 1)
         #expect(last.first?.start == start.addingTimeInterval(200))
-        #expect(aggregator.flush().isEmpty)
+        let again = aggregator.flush()
+        #expect(again.isEmpty)
     }
 }
