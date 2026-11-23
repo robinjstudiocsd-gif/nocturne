@@ -59,6 +59,33 @@ struct NightAveragesTests {
         #expect(abs((comparison.wakeCount ?? 0) + 1.0 / 3.0) < 0.0001)
     }
 
+    @Test("Rapport d'une nuit : score, fiabilité, et score moyen des nuits précédentes")
+    func report() {
+        let tonight = night(bed: at(22, 0, 30), onset: at(22, 0, 45), wake: at(22, 7, 30), getUp: at(22, 7, 40))
+        let report = NightReporter(calendar: paris).report(for: tonight, among: previousNights() + [tonight])
+
+        // Durée 0,875 ; continuité 1 ; réveils 1 ; régularité (écart de 60 min) 0,663 : 87 sur 80 points comptés.
+        #expect(report.score.total == 87)
+        #expect(report.reliability == .medium)
+        #expect(report.reliabilityText == "Fiabilité moyenne")
+        #expect(report.quality == .veryGood)
+        #expect(report.previousNights == 3)
+        // Chaque nuit précédente n'a que 60 points de critères : 100, arrondi à 5.
+        #expect(report.averageScore == 100)
+        #expect(report.comparison.asleep == -55 * 60)
+        #expect(NightReporter.previousNights(of: tonight, among: previousNights()).map(\.times.bedtime) == [at(20, 22, 30), at(19, 23, 30), at(18, 23, 0)])
+    }
+
+    @Test("Écarts écrits avec leur signe")
+    func differences() {
+        let format = SleepFormat(calendar: paris)
+        #expect(DifferenceText.duration(-55 * 60, format: format) == "\u{2212}55 min")
+        #expect(DifferenceText.duration(107 * 60, format: format) == "+1 h 47")
+        #expect(DifferenceText.duration(20, format: format) == "=")
+        #expect(DifferenceText.points(-13) == "\u{2212}13")
+        #expect(DifferenceText.points(4.4) == "+4")
+    }
+
     @Test("Heures autour de minuit sans saut")
     func clock() {
         #expect(NightAverages.minutesAfterNoon(at(22, 23, 0), calendar: paris) == 660)

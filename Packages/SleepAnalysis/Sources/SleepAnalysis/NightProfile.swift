@@ -427,3 +427,17 @@ struct EpochMarks {
         }
     }
 }
+
+/// Profil d'une nuit enregistrée, relu à la demande (fiche de nuit, accueil).
+public protocol NightProfileProviding: Sendable {
+    func profile(for session: SleepSession) async -> NightProfile?
+}
+
+/// Aucun profil : pour les aperçus et les écrans sans enregistrement.
+public struct NoNightProfiles: NightProfileProviding {
+    public init() {}
+
+    public func profile(for session: SleepSession) async -> NightProfile? {
+        nil
+    }
+}

@@ -47,6 +47,20 @@ struct NightAnalyzerTests {
         #expect(NightAnalyzer.journalLine(profile).contains("mouvements et son"))
     }
 
+    @Test("Profils relus à la demande, seulement pour une nuit enregistrée et terminée")
+    func recordedProfiles() async throws {
+        let night = try recordNight()
+        defer { try? FileManager.default.removeItem(at: night.storage.root) }
+        let provider = RecordedNightProfiles(storage: night.storage, events: InMemoryNightEventRepository())
+
+        let profile = await provider.profile(for: night.session)
+        #expect(profile?.sleepOnset == bedtime.addingTimeInterval(5 * 60))
+
+        var running = night.session
+        running.state = .running
+        #expect(await provider.profile(for: running) == nil)
+    }
+
     @Test("Un niveau sonore commencé en retard est recalé sur le coucher")
     func alignment() throws {
         let night = try recordNight(levelsDelay: 30)

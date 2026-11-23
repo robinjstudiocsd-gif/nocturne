@@ -73,3 +73,23 @@ public struct NightAnalyzer: Sendable {
         return parts.joined(separator: " · ")
     }
 }
+
+/// Profils des nuits enregistrées, relus depuis leurs fichiers avec les sons reconnus.
+public struct RecordedNightProfiles: NightProfileProviding {
+    private let analyzer: NightAnalyzer
+    private let events: any NightEventRepository
+
+    public init(storage: RecordingStorage, events: any NightEventRepository) {
+        self.analyzer = NightAnalyzer(storage: storage)
+        self.events = events
+    }
+
+    public func profile(for session: SleepSession) async -> NightProfile? {
+        guard session.recordingMode != .off, session.state != .running else { return nil }
+        let nightEvents = (try? await events.events(sessionID: session.id)) ?? []
+        let analyzer = self.analyzer
+        return await Task.detached(priority: .userInitiated) {
+            analyzer.profile(for: session, events: nightEvents)
+        }.value
+    }
+}
