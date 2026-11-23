@@ -340,7 +340,7 @@ private struct WeekChart: View {
                     let center = CGFloat(index) * (column + gap) + column / 2
                     if let asleep = bar.asleep {
                         let barHeight = max(2, CGFloat(asleep) * scale)
-                        UnevenRoundedRectangle(cornerRadii: .init(topLeading: 4, topTrailing: 4), style: .continuous)
+                        UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 4, style: .continuous)
                             .fill(bar.isLast ? NocturneColor.lavender : NocturneColor.moonBlue)
                             .frame(width: barWidth, height: barHeight)
                             .position(x: center, y: baseline - barHeight / 2)
