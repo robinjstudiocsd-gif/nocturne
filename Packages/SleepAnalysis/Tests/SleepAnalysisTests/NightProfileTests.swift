@@ -130,17 +130,41 @@ struct NightProfileTests {
             kind: .nap,
             start: start,
             end: minutes(20),
-            motion: motion(count: 40, [(0..<4, 30), (12..<13, 16), (18..<19, 16), (24..<25, 16)])
+            motion: motion(count: 40, [(0..<4, 30), (10..<11, 16), (22..<23, 16)])
         )
         let profile = NightProfiler.analyze(input)
 
         #expect(profile.usedMotion)
         #expect(!profile.usedSound)
         #expect(profile.reliability == .low)
-        #expect(profile.states[12] == .agitated)
+        #expect(profile.states[10] == .agitated)
         #expect(profile.sleepOnset == minutes(2))
         #expect(profile.wake == minutes(20))
         #expect(profile.wakeEpisodes.isEmpty)
+    }
+
+    @Test("iPhone sur la table de nuit : le prendre en main ou le déverrouiller marque un éveil")
+    func handlingAndUnlocks() {
+        let quiet = sound(seconds: 3_600)
+        let input = ProfileInput(
+            start: start,
+            end: minutes(60),
+            motion: motion(count: 120, rest: 4, [(60..<65, 60)]),
+            peaks: quiet.peaks,
+            means: quiet.means,
+            unlocks: [DateInterval(start: minutes(45), end: minutes(48))]
+        )
+        let profile = NightProfiler.analyze(input)
+
+        #expect(!profile.usedMotion)
+        #expect(profile.reliability == .low)
+        #expect(profile.states[62] == .awake)
+        #expect(profile.states[92] == .awake)
+        #expect(profile.states[70] == .calm)
+        #expect(profile.sleepOnset == minutes(0))
+        #expect(profile.wake == minutes(60))
+        #expect(profile.wakeEpisodes.map(\.start) == [minutes(30), minutes(45)])
+        #expect(profile.wakeEpisodes.map(\.end) == [minutes(32.5), minutes(48)])
     }
 
     @Test("Sans aucune mesure : pas d'horaire deviné")

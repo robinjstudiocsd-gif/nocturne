@@ -3,7 +3,7 @@ import SleepAnalysis
 import SleepDomain
 
 /// Profil d'une nuit d'après ses fichiers : niveau sonore chaque seconde, mouvements par 30 secondes,
-/// et sons reconnus pendant la nuit.
+/// déverrouillages de l'iPhone et sons reconnus pendant la nuit.
 public struct NightAnalyzer: Sendable {
     private let storage: RecordingStorage
 
@@ -31,6 +31,10 @@ public struct NightAnalyzer: Sendable {
             let motionStart = MotionSeries.start(of: data) ?? start
             let offset = Int((motionStart.timeIntervalSince(start) / NightProfile.epoch).rounded())
             input.motion = Self.align(motion, offset: offset)
+        }
+        if var unlocks = UnlockLog.read(from: folder) {
+            unlocks.finish(at: end)
+            input.unlocks = unlocks.usablePeriods
         }
         return input
     }

@@ -53,6 +53,8 @@ public struct ProfileInput: Sendable {
     public var means: [Float?]
     /// Sons reconnus pendant la nuit.
     public var events: [NightEvent]
+    /// Moments où l'iPhone était déverrouillé : chaque usage du téléphone marque un éveil probable.
+    public var unlocks: [DateInterval]
 
     public init(
         kind: SessionKind = .night,
@@ -61,7 +63,8 @@ public struct ProfileInput: Sendable {
         motion: [Float?] = [],
         peaks: [Float?] = [],
         means: [Float?] = [],
-        events: [NightEvent] = []
+        events: [NightEvent] = [],
+        unlocks: [DateInterval] = []
     ) {
         self.kind = kind
         self.start = start
@@ -70,6 +73,7 @@ public struct ProfileInput: Sendable {
         self.peaks = peaks
         self.means = means
         self.events = events
+        self.unlocks = unlocks
     }
 }
 
@@ -127,8 +131,13 @@ public enum NightProfiler {
     public static let agitatedMotion: Float = 4
     /// Mouvement qui, s'il dure plus d'une période, signale un éveil probable. Se retourner une fois reste « agité ».
     public static let awakeMotion: Float = 12
-    /// Périodes agitées qu'il faut au milieu de la nuit pour croire que l'iPhone était sur le lit.
-    public static let minimumMovingEpochs = 3
+    /// Mouvements séparés qu'il faut sentir au milieu de la nuit pour croire que l'iPhone était sur le lit.
+    /// Posé sur la table de nuit, il ne bouge que lorsqu'on le prend en main.
+    public static let minimumMovements = 4
+    /// Même chose pour une session de moins de 2 heures.
+    public static let minimumMovementsShort = 2
+    /// Deux mouvements sont séparés quand 5 minutes calmes (10 périodes) les séparent.
+    public static let separateMovements = 10
     /// Écart au bruit de fond qui compte comme un son, comme pendant la nuit.
     public static let soundThreshold: Float = 10
     /// Part des secondes bruyantes qui rend une période agitée, avec le son seul.
@@ -151,12 +160,12 @@ public enum NightProfiler {
         let count = max(1, Int((input.end.timeIntervalSince(input.start) / NightProfile.epoch).rounded(.up)))
         let motion = motionLevels(input.motion, count: count)
         let sound = soundActivity(input, count: count)
-        let marks = EpochMarks(events: input.events, start: input.start, count: count)
+        let marks = EpochMarks(events: input.events, unlocks: input.unlocks, start: input.start, count: count)
         let states = (0..<count).map { index in
             classify(index, motion: motion, sound: sound[index], marks: marks)
         }
 
-        let usedMotion = motion != nil
+        let usedMotion = motion?.onBed == true
         let usedSound = sound.contains { $0 != nil }
         let onsetLength = max(1, Int(onsetCalm(for: input.kind) / NightProfile.epoch))
         var sleepOnset: Date?
@@ -188,15 +197,23 @@ public enum NightProfiler {
 
     // MARK: - Une période
 
-    static func classify(_ index: Int, motion: [Float?]?, sound: Double?, marks: EpochMarks) -> EpochState {
-        let moved: Float? = motion.flatMap { $0[index] }
+    static func classify(_ index: Int, motion: MotionLevels?, sound: Double?, marks: EpochMarks) -> EpochState {
+        if marks.unlocked[index] {
+            return .awake
+        }
+        let level: Float? = motion.flatMap { $0.levels[index] }
+        if let motion, !motion.onBed, let level, level >= awakeMotion {
+            // L'iPhone posé à côté du lit a été pris en main.
+            return .awake
+        }
+        let moved: Float? = motion?.onBed == true ? level : nil
         if marks.snoring[index], moved != nil || sound != nil {
             // On ronfle en dormant : calme, ou agité si le lit bouge beaucoup.
             return (moved ?? 0) >= awakeMotion ? .agitated : .calm
         }
         if let moved {
             let noisy = sound ?? 0
-            let lasting = moved >= awakeMotion && hasMovingNeighbor(index, motion: motion)
+            let lasting = moved >= awakeMotion && hasMovingNeighbor(index, levels: motion?.levels ?? [])
             if lasting || (moved >= agitatedMotion && (marks.speech[index] || noisy >= awakeSound)) {
                 return .awake
             }
@@ -218,18 +235,17 @@ public enum NightProfiler {
     }
 
     /// Vrai si la période d'avant ou d'après bouge aussi : le mouvement dure plus de 30 secondes.
-    static func hasMovingNeighbor(_ index: Int, motion: [Float?]?) -> Bool {
-        guard let motion else { return false }
-        return [index - 1, index + 1].contains { neighbor in
-            neighbor >= 0 && neighbor < motion.count && (motion[neighbor] ?? 0) >= agitatedMotion
+    static func hasMovingNeighbor(_ index: Int, levels: [Float?]) -> Bool {
+        [index - 1, index + 1].contains { neighbor in
+            neighbor >= 0 && neighbor < levels.count && (levels[neighbor] ?? 0) >= agitatedMotion
         }
     }
 
     // MARK: - Mesures
 
-    /// Mouvement de chaque période au-dessus du repos de la nuit, ou nil si l'iPhone n'était pas sur le lit :
-    /// posé sur la table de nuit, il ne sent presque rien en dehors du coucher et du lever.
-    static func motionLevels(_ values: [Float?], count: Int) -> [Float?]? {
+    /// Mouvement de chaque période au-dessus du repos de la nuit, et si l'iPhone était sur le lit ; nil sans mesure.
+    /// Sur le matelas, il sent chaque fois qu'on se retourne ; sur la table de nuit, seulement quand on le prend.
+    static func motionLevels(_ values: [Float?], count: Int) -> MotionLevels? {
         let measured = values.prefix(count).compactMap { $0 }
         guard !measured.isEmpty else { return nil }
         let rest = percentile(measured, 0.1)
@@ -237,11 +253,20 @@ public enum NightProfiler {
             guard index < values.count, let value = values[index] else { return nil }
             return max(0, value - rest)
         }
+        // Le coucher et le lever (10 premières et 10 dernières minutes) ne comptent pas.
         let margin = min(20, count / 5)
-        let moving = levels.indices.filter { index in
-            index >= margin && index < count - margin && (levels[index] ?? 0) >= agitatedMotion
+        var movements = 0
+        var lastMoving: Int?
+        for index in margin..<max(margin, count - margin) where (levels[index] ?? 0) >= agitatedMotion {
+            if let last = lastMoving, index - last < separateMovements {
+                lastMoving = index
+                continue
+            }
+            movements += 1
+            lastMoving = index
         }
-        return moving.count >= minimumMovingEpochs ? levels : nil
+        let needed = Double(count) * NightProfile.epoch < 2 * 3_600 ? minimumMovementsShort : minimumMovements
+        return MotionLevels(levels: levels, onBed: movements >= needed)
     }
 
     /// Part des secondes de chaque période où un son de la personne dépasse le bruit de fond de 10 dB.
@@ -361,16 +386,32 @@ public enum NightProfiler {
     }
 }
 
-/// Périodes où un son de la personne a été reconnu.
+/// Mouvements de la nuit au-dessus du repos, en milli-g, et place de l'iPhone.
+struct MotionLevels {
+    var levels: [Float?]
+    var onBed: Bool
+}
+
+/// Périodes où un son de la personne a été reconnu, et périodes où l'iPhone était déverrouillé.
 struct EpochMarks {
     var snoring: [Bool]
     var speech: [Bool]
     var cough: [Bool]
+    var unlocked: [Bool]
 
-    init(events: [NightEvent], start: Date, count: Int) {
+    init(events: [NightEvent], unlocks: [DateInterval] = [], start: Date, count: Int) {
         snoring = [Bool](repeating: false, count: count)
         speech = [Bool](repeating: false, count: count)
         cough = [Bool](repeating: false, count: count)
+        unlocked = [Bool](repeating: false, count: count)
+        for period in unlocks {
+            let first = max(0, Int((period.start.timeIntervalSince(start) / NightProfile.epoch).rounded(.down)))
+            let last = min(count - 1, Int((period.end.timeIntervalSince(start) / NightProfile.epoch).rounded(.up)) - 1)
+            guard first <= last else { continue }
+            for index in first...last {
+                unlocked[index] = true
+            }
+        }
         for event in events where !event.isSomeoneElse {
             let first = max(0, Int((event.start.timeIntervalSince(start) / NightProfile.epoch).rounded(.down)))
             let last = min(count - 1, Int((event.end.timeIntervalSince(start) / NightProfile.epoch).rounded(.up)) - 1)

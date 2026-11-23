@@ -61,6 +61,33 @@ struct NightAnalyzerTests {
         #expect(NightAnalyzer.align([1, 2, 3], offset: -1) == [2, 3])
     }
 
+    @Test("Déverrouillages : gardés seulement si iOS a signalé un verrouillage ; le dernier se ferme à l'arrêt")
+    func unlocks() throws {
+        var log = UnlockLog()
+        log.unlocked(at: bedtime)
+        log.locked(at: bedtime.addingTimeInterval(60))
+        log.unlocked(at: bedtime.addingTimeInterval(3_000))
+        #expect(log.periods == [DateInterval(start: bedtime, end: bedtime.addingTimeInterval(60))])
+
+        var withoutCode = UnlockLog()
+        withoutCode.unlocked(at: bedtime)
+        withoutCode.finish(at: bedtime.addingTimeInterval(3_600))
+        #expect(withoutCode.periods.count == 1)
+        #expect(withoutCode.usablePeriods.isEmpty)
+
+        let night = try recordNight()
+        defer { try? FileManager.default.removeItem(at: night.storage.root) }
+        let folder = try #require(night.storage.folder(sessionID: night.session.id))
+        try log.write(to: folder)
+        #expect(UnlockLog.read(from: folder) == log)
+
+        let input = try #require(NightAnalyzer(storage: night.storage).input(for: night.session, events: []))
+        #expect(input.unlocks == [
+            DateInterval(start: bedtime, end: bedtime.addingTimeInterval(60)),
+            DateInterval(start: bedtime.addingTimeInterval(3_000), end: bedtime.addingTimeInterval(3_600))
+        ])
+    }
+
     @Test("Une nuit sans dossier n'a que ses horaires ; une nuit sans horaires n'est pas analysée")
     func missingFiles() {
         let storage = RecordingStorage(root: FileManager.default.temporaryDirectory.appendingPathComponent("vide-\(UUID().uuidString)"))

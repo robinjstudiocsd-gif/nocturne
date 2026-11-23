@@ -19,6 +19,9 @@ public final class NightSessionController: NightRecordingService {
 
     private let engine = AVAudioEngine()
     private let interruptions = InterruptionMonitor()
+    private let unlockMonitor = UnlockMonitor()
+    private var unlockLog: UnlockLog?
+    private var nightFolder: URL?
     private let liveActivity = NightActivityController()
     private var pipeline: CapturePipeline?
     private var motion: MotionSampler?
@@ -83,6 +86,7 @@ public final class NightSessionController: NightRecordingService {
     public func stop() async throws -> SleepSession? {
         guard let session = try await lifecycle.running() else { return nil }
         stopListening()
+        finishUnlockLog()
         let classified = pipeline?.classifiesSounds ?? false
         if let remaining = pipeline?.closeEvents(), !remaining.isEmpty {
             try? await events.save(remaining)
@@ -216,6 +220,7 @@ public final class NightSessionController: NightRecordingService {
         interruptions.start(engine: engine) { [weak self] event in
             self?.handle(event)
         }
+        startUnlockLog(folder: storage.url(for: layout.relativeFolder))
         status.isListening = true
         status.needsResume = false
     }
@@ -326,6 +331,50 @@ public final class NightSessionController: NightRecordingService {
         }
         journal.record("Extraits : \(clips.count - removed) gardés, \(removed) sans son reconnu effacés")
     }
+
+    // MARK: - Déverrouillages
+
+    /// Chaque usage du téléphone marque un éveil probable : les déverrouillages sont gardés dans le dossier de la nuit.
+    private func startUnlockLog(folder: URL) {
+        if unlockLog == nil {
+            unlockLog = UnlockLog.read(from: folder) ?? UnlockLog()
+        }
+        nightFolder = folder
+        if UIApplication.shared.isProtectedDataAvailable {
+            recordUnlock(.unlocked)
+        }
+        unlockMonitor.start { [weak self] event in
+            self?.recordUnlock(event)
+        }
+    }
+
+    private func recordUnlock(_ event: UnlockEvent) {
+        guard var log = unlockLog, let folder = nightFolder else { return }
+        switch event {
+        case .locked:
+            log.locked(at: Date())
+        case .unlocked:
+            log.unlocked(at: Date())
+        }
+        unlockLog = log
+        do {
+            try log.write(to: folder)
+        } catch {
+            journal.record("Déverrouillages non enregistrés : \(error.localizedDescription)")
+        }
+    }
+
+    private func finishUnlockLog() {
+        unlockMonitor.stop()
+        if var log = unlockLog, let folder = nightFolder {
+            log.finish(at: Date())
+            try? log.write(to: folder)
+        }
+        unlockLog = nil
+        nightFolder = nil
+    }
+
+    // MARK: - Analyse
 
     /// Profil de la nuit d'après les mouvements et les sons : endormissement, réveil et réveils dans la nuit.
     /// L'analyse lit les fichiers hors de l'interface ; en cas d'échec, la nuit garde ses horaires d'arrêt.
