@@ -80,7 +80,10 @@ final class AppContainer {
             sessions: sessions,
             events: events,
             profiles: RecordedNightProfiles(storage: storage, events: events),
-            sleepNeed: { TimeInterval(preferences.sleepNeedMinutes * 60) }
+            sleepNeed: { TimeInterval(preferences.sleepNeedMinutes * 60) },
+            preflight: preflight,
+            recordingMode: { preferences.recordingMode },
+            quality: AppContainer.audioQuality
         ))
     }
 

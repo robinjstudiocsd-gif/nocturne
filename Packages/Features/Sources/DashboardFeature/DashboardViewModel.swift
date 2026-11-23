@@ -11,19 +11,29 @@ public struct DashboardDependencies: Sendable {
     /// Besoin de sommeil par nuit, pour la dette.
     public let sleepNeed: @Sendable () -> TimeInterval
     public let goals: @Sendable () -> ScoreGoals
+    /// Vérifications du soir (batterie, signature, espace libre) ; nil dans les aperçus.
+    public let preflight: (any PreflightProvider)?
+    public let recordingMode: @Sendable () -> RecordingMode
+    public let quality: AudioQuality
 
     public init(
         sessions: any SleepSessionRepository,
         events: any NightEventRepository,
         profiles: any NightProfileProviding,
         sleepNeed: @escaping @Sendable () -> TimeInterval,
-        goals: @escaping @Sendable () -> ScoreGoals = { ScoreGoals() }
+        goals: @escaping @Sendable () -> ScoreGoals = { ScoreGoals() },
+        preflight: (any PreflightProvider)? = nil,
+        recordingMode: @escaping @Sendable () -> RecordingMode = { .continuous },
+        quality: AudioQuality = .standard
     ) {
         self.sessions = sessions
         self.events = events
         self.profiles = profiles
         self.sleepNeed = sleepNeed
         self.goals = goals
+        self.preflight = preflight
+        self.recordingMode = recordingMode
+        self.quality = quality
     }
 }
 
@@ -39,6 +49,15 @@ public struct WeekBar: Identifiable, Hashable, Sendable {
     public var id: Date { day }
 }
 
+/// Une vérification de la carte « Ce soir » : « Batterie à 64 % : branche ton iPhone pour la nuit ».
+public struct TonightCheck: Identifiable, Hashable, Sendable {
+    public let kind: PreflightItem.Kind
+    public let isReady: Bool
+    public let text: String
+
+    public var id: PreflightItem.Kind { kind }
+}
+
 /// Modèle de vue de l'accueil (maquette E10) : dernière nuit, dette de sommeil, régularité, 7 dernières nuits.
 @MainActor
 @Observable
@@ -50,6 +69,7 @@ public final class DashboardViewModel {
     public private(set) var debt: SleepDebt? = nil
     public private(set) var regularity: TimeInterval? = nil
     public private(set) var week: [WeekBar] = []
+    public private(set) var checks: [TonightCheck] = []
     public private(set) var errorMessage: String? = nil
     public private(set) var isLoaded = false
 
@@ -68,6 +88,7 @@ public final class DashboardViewModel {
     }
 
     public func load() async {
+        await loadChecks()
         do {
             let all = try await dependencies.sessions.sessions(in: nil)
             let nights = all
@@ -98,6 +119,51 @@ public final class DashboardViewModel {
         } catch {
             errorMessage = "Impossible de lire tes nuits : \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Ce soir
+
+    /// Batterie, signature et espace libre, comme sur « Préparer ma nuit ».
+    private func loadChecks() async {
+        guard let preflight = dependencies.preflight else { return }
+        let readings = await preflight.readings()
+        let items = Preflight.evaluate(
+            readings,
+            kind: .night,
+            mode: dependencies.recordingMode(),
+            quality: dependencies.quality,
+            alarm: nil,
+            now: now(),
+            format: format
+        )
+        checks = [PreflightItem.Kind.battery, .signature, .storage].compactMap { kind in
+            items.first { $0.kind == kind }.map(Self.check)
+        }
+    }
+
+    static func check(_ item: PreflightItem) -> TonightCheck {
+        let base: String
+        switch item.kind {
+        case .battery:
+            base = item.status == .unknown ? "Batterie inconnue" : "Batterie à \(item.value)"
+        case .signature:
+            base = item.status == .unknown ? "Signature de l’app : date inconnue" : "Signature de l’app valide \(item.value)"
+        case .storage:
+            base = item.status == .unknown ? "Espace libre inconnu" : "\(item.value) libres"
+        case .volume, .permissions:
+            base = "\(item.title) : \(item.value)"
+        }
+        var detail = item.detail
+        if detail == nil, item.kind == .storage, item.status == .ready {
+            detail = "largement assez pour la nuit"
+        }
+        let text = detail.map { base + " : " + Self.lowercasedFirst($0) } ?? base
+        return TonightCheck(kind: item.kind, isReady: item.status == .ready, text: text)
+    }
+
+    static func lowercasedFirst(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return first.lowercased() + text.dropFirst()
     }
 
     // MARK: - Dernière nuit

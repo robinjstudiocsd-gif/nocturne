@@ -81,6 +81,22 @@ public struct DashboardView: View {
                         .foregroundStyle(NocturneColor.textSecondary)
                 }
             }
+            if !model.checks.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(model.checks) { check in
+                        Label {
+                            Text(check.text)
+                                .foregroundStyle(check.isReady ? NocturneColor.textSecondary : NocturneColor.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } icon: {
+                            Image(systemName: check.isReady ? "checkmark.circle" : "exclamationmark.triangle")
+                                .foregroundStyle(check.isReady ? NocturneColor.success : NocturneColor.amber)
+                                .accessibilityLabel(check.isReady ? "Prêt" : "À faire")
+                        }
+                        .font(.subheadline)
+                    }
+                }
+            }
             Button("Préparer ma nuit", action: onPrepareNight)
                 .buttonStyle(PrimaryButtonStyle())
         }
