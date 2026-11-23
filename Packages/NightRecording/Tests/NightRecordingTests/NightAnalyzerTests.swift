@@ -1,0 +1,75 @@
+import Foundation
+import SleepAnalysis
+import SleepDomain
+import Testing
+@testable import NightRecording
+
+@Suite("Analyse d'une nuit enregistrée")
+struct NightAnalyzerTests {
+    private let bedtime = Date(timeIntervalSince1970: 1_795_300_000)
+
+    /// Une heure : 5 min agitées au coucher, trois retournements, 5 min de lever ; sons calmes.
+    private func recordNight(levelsDelay: Int = 0) throws -> (storage: RecordingStorage, session: SleepSession) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("nocturne-analyse-\(UUID().uuidString)", isDirectory: true)
+        let storage = RecordingStorage(root: root)
+        let end = bedtime.addingTimeInterval(3_600)
+        let session = SleepSession(state: .finished, detected: SessionTimes(bedtime: bedtime, wake: end, getUp: end))
+        let layout = SegmentLayout(sessionID: session.id, start: bedtime)
+        _ = try storage.prepareFolder(for: layout)
+
+        let levels = try LevelSeriesWriter(fileURL: storage.url(for: layout.relativeLevelsPath), start: bedtime.addingTimeInterval(Double(levelsDelay)))
+        try levels.append((0..<(3_600 - levelsDelay)).map { LevelSecond(second: $0, meanDb: -60, maxDb: -59) })
+        try levels.close()
+
+        let motion = try MotionSeriesWriter(fileURL: storage.url(for: layout.relativeMotionPath), start: bedtime)
+        try motion.append((0..<120).map { index in
+            let moving = index < 10 || index >= 110
+            let turning = [40, 60, 80].contains(index)
+            return MotionWindow(index: index, activity: moving ? 30 : (turning ? 26 : 6))
+        })
+        try motion.close()
+        return (storage, session)
+    }
+
+    @Test("Les fichiers de la nuit donnent l'endormissement et le réveil")
+    func profileFromFiles() throws {
+        let night = try recordNight()
+        defer { try? FileManager.default.removeItem(at: night.storage.root) }
+
+        let profile = try #require(NightAnalyzer(storage: night.storage).profile(for: night.session, events: []))
+
+        #expect(profile.usedMotion)
+        #expect(profile.usedSound)
+        #expect(profile.reliability == .medium)
+        #expect(profile.sleepOnset == bedtime.addingTimeInterval(5 * 60))
+        #expect(profile.wake == bedtime.addingTimeInterval(55 * 60))
+        #expect(profile.wakeEpisodes.isEmpty)
+        #expect(NightAnalyzer.journalLine(profile).contains("mouvements et son"))
+    }
+
+    @Test("Un niveau sonore commencé en retard est recalé sur le coucher")
+    func alignment() throws {
+        let night = try recordNight(levelsDelay: 30)
+        defer { try? FileManager.default.removeItem(at: night.storage.root) }
+
+        let input = try #require(NightAnalyzer(storage: night.storage).input(for: night.session, events: []))
+
+        #expect(input.peaks.count == 3_600)
+        #expect(input.peaks[29] == nil)
+        #expect(input.peaks[30] == -59)
+        #expect(input.motion.count == 120)
+        #expect(NightAnalyzer.align([1, 2, 3], offset: -1) == [2, 3])
+    }
+
+    @Test("Une nuit sans dossier n'a que ses horaires ; une nuit sans horaires n'est pas analysée")
+    func missingFiles() {
+        let storage = RecordingStorage(root: FileManager.default.temporaryDirectory.appendingPathComponent("vide-\(UUID().uuidString)"))
+        let end = bedtime.addingTimeInterval(3_600)
+        let session = SleepSession(state: .finished, detected: SessionTimes(bedtime: bedtime, wake: end, getUp: end))
+        let analyzer = NightAnalyzer(storage: storage)
+
+        #expect(analyzer.input(for: session, events: [])?.peaks.isEmpty == true)
+        #expect(analyzer.profile(for: session, events: [])?.sleepOnset == nil)
+        #expect(analyzer.profile(for: SleepSession(state: .manual), events: []) == nil)
+    }
+}

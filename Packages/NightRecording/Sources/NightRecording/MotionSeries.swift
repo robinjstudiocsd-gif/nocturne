@@ -79,6 +79,17 @@ public enum MotionSeries {
         return data
     }
 
+    /// Heure de début écrite dans l'en-tête.
+    public static func start(of data: Data) -> Date? {
+        let bytes = [UInt8](data)
+        guard bytes.count >= 16, Array(bytes[0..<4]) == magic else { return nil }
+        var bits: UInt64 = 0
+        for (offset, byte) in bytes[8..<16].enumerated() {
+            bits |= UInt64(byte) << (8 * UInt64(offset))
+        }
+        return Date(timeIntervalSince1970: Double(bitPattern: bits))
+    }
+
     /// Lit les fenêtres d'un fichier (nil pour une fenêtre sans mesure).
     public static func read(_ data: Data) -> [Float?]? {
         let bytes = [UInt8](data)

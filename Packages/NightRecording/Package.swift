@@ -8,10 +8,11 @@ let package = Package(
         .library(name: "NightRecording", targets: ["NightRecording"])
     ],
     dependencies: [
-        .package(path: "../SleepDomain")
+        .package(path: "../SleepDomain"),
+        .package(path: "../SleepAnalysis")
     ],
     targets: [
-        .target(name: "NightRecording", dependencies: ["SleepDomain"]),
-        .testTarget(name: "NightRecordingTests", dependencies: ["NightRecording", "SleepDomain"])
+        .target(name: "NightRecording", dependencies: ["SleepDomain", "SleepAnalysis"]),
+        .testTarget(name: "NightRecordingTests", dependencies: ["NightRecording", "SleepDomain", "SleepAnalysis"])
     ]
 )

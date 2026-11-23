@@ -1,4 +1,5 @@
 import Foundation
+import SleepDomain
 
 /// Un jour de la dette de sommeil.
 public struct SleepDebtDay: Equatable, Sendable {

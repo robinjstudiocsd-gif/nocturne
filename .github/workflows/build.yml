@@ -30,7 +30,7 @@ jobs:
       - name: Tests des modules
         run: |
           set -euo pipefail
-          for package in SleepDomain Persistence AppSettings NightRecording; do
+          for package in SleepDomain SleepAnalysis Persistence AppSettings NightRecording; do
             echo "::group::Tests de $package"
             swift test --package-path "Packages/$package"
             echo "::endgroup::"

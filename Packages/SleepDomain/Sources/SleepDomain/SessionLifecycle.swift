@@ -85,6 +85,34 @@ public struct SessionLifecycle: Sendable {
         return session
     }
 
+    /// Enregistre ce que l'analyse de la nuit a trouvé : endormissement, réveil et réveils dans la nuit.
+    /// Les corrections et les réveils saisis à la main restent ; le lever garde l'heure de l'arrêt.
+    @discardableResult
+    public func saveDetection(
+        id: UUID,
+        sleepOnset: Date?,
+        wake: Date?,
+        wakeEpisodes: [WakeEpisode],
+        source: DataSource?,
+        analysisVersion: Int
+    ) async throws -> SleepSession {
+        guard var session = try await repository.session(id: id) else { throw SessionError.notFound }
+        if let sleepOnset {
+            session.detected.sleepOnset = sleepOnset
+        }
+        if let wake {
+            session.detected.wake = wake
+        }
+        let typed = session.wakeEpisodes.filter { $0.source == .manual }
+        session.wakeEpisodes = (typed + wakeEpisodes).sorted { $0.start < $1.start }
+        if let source {
+            session.primarySource = source
+        }
+        session.analysisVersion = analysisVersion
+        try await repository.save(session)
+        return session
+    }
+
     /// Enregistre une nuit ou une sieste saisie à la main, après vérification des horaires.
     @discardableResult
     public func addManual(kind: SessionKind, times: SessionTimes, comment: String?) async throws -> SleepSession {

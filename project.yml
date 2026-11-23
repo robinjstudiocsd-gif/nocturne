@@ -20,6 +20,8 @@ settings:
 packages:
   SleepDomain:
     path: Packages/SleepDomain
+  SleepAnalysis:
+    path: Packages/SleepAnalysis
   Persistence:
     path: Packages/Persistence
   AppSettings:

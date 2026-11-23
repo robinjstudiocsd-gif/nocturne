@@ -11,7 +11,7 @@ L'app est découpée en packages Swift locaux. L'interface et les services dépe
 | `AppSettings` | Préférences typées et valeurs par défaut, date d'expiration de la signature, suivi des renouvellements | Lot 0 |
 | `DesignSystem` | Couleurs, typographie, cartes, boutons, anneau du score | Lot 0 |
 | `Features` | Un module par rubrique : Accueil, Journal, Nuit, Statistiques, Conseils, Réglages | Lot 0 (écrans de départ) |
-| `SleepAnalysis` | Métriques, profil de nuit, phases estimées, score, statistiques | Lot 4 |
+| `SleepAnalysis` | Métriques, profil de nuit, phases estimées, score, statistiques | Lot 4 (en cours) |
 | `NightRecording` | Session de nuit, capture audio, tranches AAC de 5 min, niveau sonore chaque seconde (format binaire versionné), points de reprise, détection et extraits | Lot 2 (en cours) |
 | `HealthIntegration` | Lecture et écriture Santé, import de l'export Santé en repli | Lot 6 |
 | `Alarms` | Alarme jouée par l'app (iOS 18) et AlarmKit (iOS 26) | Lot 5 |
@@ -27,4 +27,4 @@ L'app est découpée en packages Swift locaux. L'interface et les services dépe
 
 ## Tests
 
-Les modules sans interface (`SleepDomain`, `Persistence`, `AppSettings`, `NightRecording`) sont testés à chaque envoi avec `swift test`, sur le Mac de GitHub. Les essais sur l'iPhone se font à la fin du développement.
+Les modules sans interface (`SleepDomain`, `SleepAnalysis`, `Persistence`, `AppSettings`, `NightRecording`) sont testés à chaque envoi avec `swift test`, sur le Mac de GitHub. Les essais sur l'iPhone se font à la fin du développement.

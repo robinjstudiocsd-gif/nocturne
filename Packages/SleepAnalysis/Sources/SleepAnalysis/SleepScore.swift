@@ -1,4 +1,5 @@
 import Foundation
+import SleepDomain
 
 /// Fiabilité d'une donnée ou d'un résultat.
 public enum Reliability: Int, Comparable, Codable, Sendable {

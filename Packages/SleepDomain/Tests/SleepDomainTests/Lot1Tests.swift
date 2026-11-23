@@ -54,6 +54,39 @@ struct Lot1Tests {
         #expect(try await lifecycle.running() == nil)
     }
 
+    @Test("L'analyse de la nuit remplace la détection, garde les réveils saisis et le lever")
+    func saveDetection() async throws {
+        let clock = TestClock(date(22, 23, 0))
+        let repository = InMemorySleepSessionRepository()
+        let lifecycle = SessionLifecycle(repository: repository, now: { clock.now })
+        let session = try await lifecycle.start(kind: .night, mode: .continuous)
+        clock.set(date(23, 7, 0))
+        try await lifecycle.stop(id: session.id)
+        let typed = WakeEpisode(start: date(23, 4, 0), end: date(23, 4, 20))
+        try await lifecycle.applyCorrection(id: session.id, corrected: SessionTimes(), wakeEpisodes: [typed], kind: .night, comment: nil)
+
+        let detected = WakeEpisode(start: date(23, 2, 0), end: date(23, 2, 10), source: .motion)
+        let saved = try await lifecycle.saveDetection(
+            id: session.id,
+            sleepOnset: date(22, 23, 25),
+            wake: date(23, 6, 40),
+            wakeEpisodes: [detected],
+            source: .motion,
+            analysisVersion: 1
+        )
+        #expect(saved.detected.bedtime == date(22, 23, 0))
+        #expect(saved.detected.sleepOnset == date(22, 23, 25))
+        #expect(saved.detected.wake == date(23, 6, 40))
+        #expect(saved.detected.getUp == date(23, 7, 0))
+        #expect(saved.wakeEpisodes.map(\.start) == [date(23, 2, 0), date(23, 4, 0)])
+        #expect(saved.primarySource == .motion)
+        #expect(saved.analysisVersion == 1)
+
+        let again = try await lifecycle.saveDetection(id: session.id, sleepOnset: nil, wake: nil, wakeEpisodes: [], source: nil, analysisVersion: 1)
+        #expect(again.wakeEpisodes == [typed])
+        #expect(again.detected.sleepOnset == date(22, 23, 25))
+    }
+
     @Test("Une nuit interrompue se termine à la dernière minute connue")
     func closeInterrupted() async throws {
         let lifecycle = SessionLifecycle(repository: InMemorySleepSessionRepository(), now: { date(22, 23, 0) })

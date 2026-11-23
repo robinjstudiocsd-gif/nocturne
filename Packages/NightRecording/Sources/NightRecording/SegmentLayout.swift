@@ -31,12 +31,17 @@ public struct SegmentLayout: Sendable {
         relativeFolder + String(format: "/extrait-%03d.m4a", index)
     }
 
+    /// Fichier du niveau sonore chaque seconde, dans le dossier de la nuit.
+    public static let levelsFileName = "niveaux.ncls"
+    /// Fichier des mouvements par 30 secondes, dans le dossier de la nuit.
+    public static let motionFileName = "mouvements.ncms"
+
     public var relativeLevelsPath: String {
-        relativeFolder + "/niveaux.ncls"
+        relativeFolder + "/" + Self.levelsFileName
     }
 
     public var relativeMotionPath: String {
-        relativeFolder + "/mouvements.ncms"
+        relativeFolder + "/" + Self.motionFileName
     }
 
     /// Vrai quand la tranche en cours a atteint sa durée.

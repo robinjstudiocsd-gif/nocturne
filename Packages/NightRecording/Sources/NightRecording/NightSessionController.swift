@@ -1,6 +1,7 @@
 #if os(iOS)
 import AVFoundation
 import Foundation
+import SleepAnalysis
 import SleepDomain
 import UIKit
 
@@ -97,8 +98,9 @@ public final class NightSessionController: NightRecordingService {
         await closePendingGap()
         liveActivity.end()
         checkpoints.clear()
-        let finished = try await lifecycle.stop(id: session.id)
+        let stopped = try await lifecycle.stop(id: session.id)
         journal.record("Nuit arrêtée · \(status.segmentCount) tranches · \(status.eventCount) événements · batterie \(NightSessionController.batteryText())")
+        let finished = await analyze(stopped)
         alarm = nil
         status = NightStatus(
             session: finished,
@@ -183,11 +185,14 @@ public final class NightSessionController: NightRecordingService {
         case .close(let end, let gap):
             guard let running else { return }
             try? await recordings.save(gap)
-            let closed = try? await lifecycle.close(id: running.id, at: end)
+            var closed = try? await lifecycle.close(id: running.id, at: end)
             checkpoints.clear()
             alarm = nil
             liveActivity.endStale()
             journal.record("Nuit interrompue, terminée à la dernière minute connue")
+            if let session = closed {
+                closed = await analyze(session)
+            }
             status = NightStatus(session: closed, mode: running.recordingMode, gaps: [gap])
         }
     }
@@ -320,6 +325,32 @@ public final class NightSessionController: NightRecordingService {
             removed += 1
         }
         journal.record("Extraits : \(clips.count - removed) gardés, \(removed) sans son reconnu effacés")
+    }
+
+    /// Profil de la nuit d'après les mouvements et les sons : endormissement, réveil et réveils dans la nuit.
+    /// L'analyse lit les fichiers hors de l'interface ; en cas d'échec, la nuit garde ses horaires d'arrêt.
+    private func analyze(_ session: SleepSession) async -> SleepSession {
+        let nightEvents = (try? await events.events(sessionID: session.id)) ?? []
+        let analyzer = NightAnalyzer(storage: storage)
+        let profile = await Task.detached(priority: .userInitiated) {
+            analyzer.profile(for: session, events: nightEvents)
+        }.value
+        guard let profile else { return session }
+        do {
+            let saved = try await lifecycle.saveDetection(
+                id: session.id,
+                sleepOnset: profile.sleepOnset,
+                wake: profile.wake,
+                wakeEpisodes: profile.wakeEpisodes,
+                source: profile.source,
+                analysisVersion: NightProfile.analysisVersion
+            )
+            journal.record("Profil de la nuit · \(NightAnalyzer.journalLine(profile))")
+            return saved
+        } catch {
+            journal.record("Profil de la nuit non enregistré : \(error.localizedDescription)")
+            return session
+        }
     }
 
     private func closePendingGap() async {

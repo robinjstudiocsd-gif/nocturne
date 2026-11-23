@@ -1,6 +1,7 @@
 import Foundation
 import Testing
-@testable import SleepDomain
+@testable import SleepAnalysis
+import SleepDomain
 
 private let paris: Calendar = {
     var calendar = Calendar(identifier: .gregorian)
