@@ -37,6 +37,11 @@ public struct SessionLifecycle: Sendable {
         self.now = now
     }
 
+    /// Toutes les sessions, de la plus récente à la plus ancienne.
+    public func sessions() async throws -> [SleepSession] {
+        try await repository.sessions(in: nil)
+    }
+
     /// La session en cours, s'il y en a une.
     public func running() async throws -> SleepSession? {
         try await repository.sessions(in: nil).first { $0.state == .running }

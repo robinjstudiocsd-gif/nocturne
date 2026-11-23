@@ -1,8 +1,10 @@
 import DesignSystem
+import SleepAnalysis
 import SleepDomain
 import SwiftUI
 
-/// Fiche de nuit (maquette E21) : nuit précédente et suivante, horaires, durées, écoute, ressenti, journal du soir.
+/// Fiche de nuit (maquette E21) : nuit précédente et suivante, score, horaires, durées, profil de la nuit,
+/// écoute, ressenti, journal du soir et comparaison avec les nuits précédentes.
 struct NightDetailView: View {
     @State private var model: NightDetailViewModel
     @State private var showsEdit = false
@@ -18,11 +20,18 @@ struct NightDetailView: View {
             if let session = model.session {
                 VStack(spacing: 12) {
                     switcher
+                    scoreHeader
                     timesCard
+                    if model.showsProfile {
+                        profileCard
+                    }
                     if model.showsListening {
                         listeningCard
                     }
                     feelingCard(session)
+                    if model.showsComparison {
+                        comparisonCard
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -94,6 +103,119 @@ struct NightDetailView: View {
         .disabled(target == nil)
         .opacity(target == nil ? 0.35 : 1)
         .accessibilityLabel(label)
+    }
+
+    // MARK: - Score
+
+    private var scoreHeader: some View {
+        HStack(spacing: 16) {
+            ScoreRing(score: model.scoreValue, approximate: model.scoreIsApproximate, size: 88)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.qualityLine)
+                    .font(.headline)
+                    .foregroundStyle(NocturneColor.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !model.chips.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(model.chips, id: \.self) { chip in
+                            InfoChip(chip)
+                        }
+                    }
+                }
+            }
+            .accessibilityElement(children: .combine)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Profil de la nuit
+
+    private var profileCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Profil de la nuit")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text("D’après les mouvements et les sons captés par l’iPhone")
+                    .font(.footnote)
+                    .foregroundStyle(NocturneColor.textSecondary)
+            }
+            BandChart(
+                rows: [
+                    BandRow(title: "Éveil", color: NocturneColor.profileAwake),
+                    BandRow(title: "Agité", color: NocturneColor.profileAgitated),
+                    BandRow(title: "Calme", color: NocturneColor.profileCalm)
+                ],
+                segments: model.profileBands.map { BandSegment(start: $0.start, end: $0.end, row: $0.row) },
+                ticks: model.profileTicks.map { ChartTick(label: $0.label, position: $0.fraction) },
+                accessibilityLabel: model.profileAccessibility
+            )
+            BandLegend(items: zip(model.profileDurations, [NocturneColor.profileAwake, NocturneColor.profileAgitated, NocturneColor.profileCalm]).map { entry, color in
+                BandLegend.Item(title: entry.title, value: entry.value, color: color)
+            })
+            VStack(alignment: .leading, spacing: 12) {
+                Rectangle()
+                    .fill(NocturneColor.separator)
+                    .frame(height: 1)
+                    .accessibilityHidden(true)
+                Text("Sans montre, les phases et le cœur ne sont pas mesurés. L’estimation expérimentale des phases est désactivée dans les réglages et n’entre jamais dans le score.")
+                    .font(.footnote)
+                    .foregroundStyle(NocturneColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NocturneColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - Comparaison
+
+    private var comparisonCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Comparaison")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text(model.comparisonSubtitle)
+                    .font(.footnote)
+                    .foregroundStyle(NocturneColor.textSecondary)
+            }
+            VStack(spacing: 0) {
+                let rows = model.comparisonRows
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    HStack(spacing: 8) {
+                        Text(row.label)
+                            .foregroundStyle(NocturneColor.textPrimary)
+                        Spacer(minLength: 4)
+                        Text(row.detail)
+                            .foregroundStyle(NocturneColor.textSecondary)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Text(row.difference)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(NocturneColor.textPrimary)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .frame(minWidth: 64, alignment: .trailing)
+                    }
+                    .font(.subheadline)
+                    .frame(minHeight: 36)
+                    .accessibilityElement(children: .combine)
+                    if index < rows.count - 1 {
+                        Rectangle()
+                            .fill(NocturneColor.separator)
+                            .frame(height: 1)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NocturneColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Horaires

@@ -1,9 +1,9 @@
 import DesignSystem
+import SleepAnalysis
 import SleepDomain
 import SwiftUI
 
-/// « Bonjour » (maquette E33) : résumé immédiat, ressenti, correction rapide des horaires, commentaire.
-/// Le score et les événements sonores s'ajouteront avec l'analyse (lots 3 et 4).
+/// « Bonjour » (maquette E33) : score et résumé immédiat, ressenti, correction rapide des horaires, commentaire.
 struct MorningView: View {
     @Bindable private var model: MorningViewModel
     private let onDone: () -> Void
@@ -52,6 +52,7 @@ struct MorningView: View {
                 model.set(field, hour: hour, minute: minute)
             }
         }
+        .task { await model.loadHistory() }
         .alert("Vérifie les horaires", isPresented: errorBinding) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -81,23 +82,30 @@ struct MorningView: View {
 
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.headline)
-                    .font(NocturneFont.number(.title2))
-                if let times = model.timesLine {
-                    Text(times)
+            HStack(alignment: .center, spacing: 16) {
+                let score = model.score
+                ScoreRing(score: score.total, approximate: score.isApproximate, size: 76)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.headline)
+                        .font(NocturneFont.number(.title2))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    if let times = model.timesLine {
+                        Text(times)
+                            .font(.subheadline)
+                            .monospacedDigit()
+                            .foregroundStyle(NocturneColor.textSecondary)
+                    }
+                    Text(model.listeningLine)
                         .font(.subheadline)
-                        .monospacedDigit()
                         .foregroundStyle(NocturneColor.textSecondary)
+                    if let events = model.eventsLine {
+                        Text(events)
+                            .font(.subheadline)
+                            .foregroundStyle(NocturneColor.textSecondary)
+                    }
                 }
-                Text(model.listeningLine)
-                    .font(.subheadline)
-                    .foregroundStyle(NocturneColor.textSecondary)
-                if let events = model.eventsLine {
-                    Text(events)
-                        .font(.subheadline)
-                        .foregroundStyle(NocturneColor.textSecondary)
-                }
+                Spacer(minLength: 0)
             }
             .accessibilityElement(children: .combine)
             if model.wasInterrupted {

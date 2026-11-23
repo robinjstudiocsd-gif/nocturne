@@ -84,7 +84,8 @@ final class AppContainer {
             eveningLogs: eveningLogs,
             lifecycle: lifecycle,
             eraser: eraser,
-            makeReplayer: { NightReplayer(storage: storage, recordings: recordings, events: events) }
+            makeReplayer: { NightReplayer(storage: storage, recordings: recordings, events: events) },
+            profiles: RecordedNightProfiles(storage: storage, events: events)
         ))
     }
 

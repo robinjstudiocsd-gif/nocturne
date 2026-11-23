@@ -50,6 +50,13 @@ public enum NocturneColor {
     public static let phaseLight = Color(hex: 0x5592E6)
     public static let phaseDeep = Color(hex: 0x7A4EDD)
 
+    // Profil de la nuit sans montre (maquette E21).
+    public static let profileAwake = Color(hex: 0xF5B971)
+    public static let profileAgitated = Color(hex: 0xA9B1D6)
+    public static let profileCalm = Color(hex: 0x5C6BA8)
+    /// Traits fins qui relient les bandes des graphiques de la nuit.
+    public static let chartLink = Color(hex: 0x3B4884)
+
     // Écran de nuit
     public static let nightScreen = Color(hex: 0x05070F)
     public static let nightClock = Color(hex: 0x9A9EBA)

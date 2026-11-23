@@ -222,6 +222,16 @@ struct NightScreenTests {
         #expect(calendar.evening(at: date(23, 14, 0)) == date(23, 0, 0))
     }
 
+    @Test("Repères d'heure : toutes les 2 heures pour une nuit, toutes les heures pour une nuit courte")
+    func hourTicks() {
+        let format = SleepFormat(calendar: paris)
+        let night = format.hourTicks(from: date(22, 0, 47), to: date(22, 9, 20))
+        #expect(night.map(\.label) == ["02:00", "04:00", "06:00", "08:00"])
+        #expect(abs((night.first?.fraction ?? 0) - 73.0 / 513.0) < 0.0001)
+        #expect(format.hourTicks(from: date(22, 14, 10), to: date(22, 16, 40)).map(\.label) == ["15:00", "16:00"])
+        #expect(format.hourTicks(from: date(22, 1, 0), to: date(22, 1, 0)).isEmpty)
+    }
+
     @Test("Temps écouté : trous et coupure en cours retirés")
     func listened() {
         var session = SleepSession(state: .running, detected: SessionTimes(bedtime: date(22, 23, 22)))

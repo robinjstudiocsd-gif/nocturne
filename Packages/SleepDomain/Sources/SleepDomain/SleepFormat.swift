@@ -102,3 +102,36 @@ public struct SleepFormat: Sendable {
         return formatter
     }
 }
+
+/// Repère d'heure sous un graphique de la nuit.
+public struct HourTick: Hashable, Sendable {
+    /// « 02:00 »
+    public var label: String
+    /// Place du repère, de 0 (début de la nuit) à 1 (fin).
+    public var fraction: Double
+
+    public init(label: String, fraction: Double) {
+        self.label = label
+        self.fraction = fraction
+    }
+}
+
+extension SleepFormat {
+    /// Repères des heures pleines entre deux heures : toutes les 2 heures (toutes les heures pour moins de 4 heures),
+    /// sans ceux qui toucheraient les bords.
+    public func hourTicks(from start: Date, to end: Date) -> [HourTick] {
+        let duration = end.timeIntervalSince(start)
+        guard duration > 0 else { return [] }
+        let everyHour = duration <= 4 * 3_600
+        var hour = calendar.dateInterval(of: .hour, for: start)?.end ?? start
+        var ticks: [HourTick] = []
+        while hour < end {
+            let fraction = hour.timeIntervalSince(start) / duration
+            if everyHour || calendar.component(.hour, from: hour) % 2 == 0, fraction > 0.04, fraction < 0.96 {
+                ticks.append(HourTick(label: clock(hour), fraction: fraction))
+            }
+            hour = hour.addingTimeInterval(3_600)
+        }
+        return ticks
+    }
+}

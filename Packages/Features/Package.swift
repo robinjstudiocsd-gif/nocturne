@@ -3,7 +3,8 @@ import PackageDescription
 
 let featureDependencies: [Target.Dependency] = [
     .product(name: "DesignSystem", package: "DesignSystem"),
-    .product(name: "SleepDomain", package: "SleepDomain")
+    .product(name: "SleepDomain", package: "SleepDomain"),
+    .product(name: "SleepAnalysis", package: "SleepAnalysis")
 ]
 
 let package = Package(
@@ -19,7 +20,8 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../DesignSystem"),
-        .package(path: "../SleepDomain")
+        .package(path: "../SleepDomain"),
+        .package(path: "../SleepAnalysis")
     ],
     targets: [
         .target(name: "DashboardFeature", dependencies: featureDependencies),

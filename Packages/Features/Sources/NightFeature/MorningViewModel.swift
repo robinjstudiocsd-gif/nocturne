@@ -1,8 +1,9 @@
 import Foundation
 import Observation
+import SleepAnalysis
 import SleepDomain
 
-/// Modèle de vue de « Bonjour » : résumé de la nuit, ressenti, horaires corrigés et commentaire.
+/// Modèle de vue de « Bonjour » : score et résumé de la nuit, ressenti, horaires corrigés et commentaire.
 @MainActor
 @Observable
 public final class MorningViewModel {
@@ -30,10 +31,14 @@ public final class MorningViewModel {
     public private(set) var wakeOverride: Date? = nil
     public private(set) var isSaving = false
     public var errorMessage: String? = nil
+    /// Nuits déjà enregistrées, pour la régularité du score.
+    public private(set) var history: [SleepSession] = []
 
     private let lifecycle: SessionLifecycle
     private let format: SleepFormat
     private let nightCalendar: NightCalendar
+    private let scorer: SleepScorer
+    private let goals: ScoreGoals
     private let now: () -> Date
 
     public init(
@@ -41,6 +46,7 @@ public final class MorningViewModel {
         snapshot: NightStatus,
         lifecycle: SessionLifecycle,
         calendar: Calendar = .current,
+        goals: ScoreGoals = ScoreGoals(),
         now: @escaping () -> Date = { Date() }
     ) {
         self.session = session
@@ -48,6 +54,8 @@ public final class MorningViewModel {
         self.lifecycle = lifecycle
         self.format = SleepFormat(calendar: calendar)
         self.nightCalendar = NightCalendar(calendar: calendar)
+        self.scorer = SleepScorer(calendar: calendar)
+        self.goals = goals
         self.now = now
         self.mood = session.feeling?.mood
         self.energy = session.feeling?.energy
@@ -75,6 +83,18 @@ public final class MorningViewModel {
         var copy = session
         copy.corrected = correctedTimes
         return copy
+    }
+
+    /// Lit les nuits précédentes, pour la régularité du score.
+    public func loadHistory() async {
+        history = (try? await lifecycle.sessions()) ?? []
+    }
+
+    // MARK: - Score
+
+    /// Score de la nuit, recalculé à chaque correction des horaires.
+    public var score: ScoreBreakdown {
+        scorer.score(ScoreInput(session: preview, previousNights: history, goals: goals))
     }
 
     // MARK: - Textes

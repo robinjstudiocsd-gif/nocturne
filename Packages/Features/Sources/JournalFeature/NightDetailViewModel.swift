@@ -1,9 +1,10 @@
 import Foundation
 import Observation
+import SleepAnalysis
 import SleepDomain
 
-/// Modèle de vue de la fiche de nuit (maquette E21) : horaires, durées, écoute, ressenti et journal du soir.
-/// Le score, les phases, les événements et la comparaison s'ajouteront avec les lots 3, 4 et 6.
+/// Modèle de vue de la fiche de nuit (maquette E21) : score, horaires, durées, profil de la nuit, écoute,
+/// ressenti, journal du soir et comparaison. Les phases et le cœur de la montre s'ajouteront au lot 6.
 @MainActor
 @Observable
 final class NightDetailViewModel {
@@ -17,9 +18,14 @@ final class NightDetailViewModel {
     private(set) var isMissing = false
     private(set) var errorMessage: String? = nil
     private(set) var currentID: UUID
+    /// Score, qualité et comparaison ; rien pendant une nuit en cours.
+    private(set) var report: NightReport? = nil
+    /// Profil calme, agité ou éveil probable, relu depuis les fichiers de la nuit.
+    private(set) var profile: NightProfile? = nil
 
     let dependencies: JournalDependencies
     let text: NightDetailText
+    private let calendar: Calendar
     private let now: () -> Date
     private let onChange: () async -> Void
 
@@ -27,6 +33,7 @@ final class NightDetailViewModel {
         self.currentID = sessionID
         self.dependencies = dependencies
         self.text = NightDetailText(calendar: calendar)
+        self.calendar = calendar
         self.now = now
         self.onChange = onChange
     }
@@ -54,8 +61,15 @@ final class NightDetailViewModel {
             recordedBytes = segments.reduce(0) { $0 + $1.byteSize }
             events = loadedEvents
             eveningLog = log
+            report = current.state == .running
+                ? nil
+                : NightReporter(calendar: calendar).report(for: current, among: all, goals: dependencies.goals())
             isMissing = false
             errorMessage = nil
+            let loadedProfile = await dependencies.profiles.profile(for: current)
+            if currentID == current.id {
+                profile = loadedProfile
+            }
         } catch {
             errorMessage = "Impossible de lire cette nuit : \(error.localizedDescription)"
         }
@@ -64,6 +78,7 @@ final class NightDetailViewModel {
     func show(_ id: UUID?) async {
         guard let id else { return }
         currentID = id
+        profile = nil
         await load()
     }
 
@@ -186,6 +201,144 @@ final class NightDetailViewModel {
     private func clock(_ date: Date?) -> String {
         date.map(text.format.clock) ?? "—"
     }
+
+    // MARK: - Score
+
+    var scoreValue: Int? {
+        report?.score.total
+    }
+
+    var scoreIsApproximate: Bool {
+        report?.score.isApproximate ?? false
+    }
+
+    /// « Qualité estimée : très bonne »
+    var qualityLine: String {
+        if session?.state == .running {
+            return "Nuit en cours"
+        }
+        if let quality = report?.quality {
+            return "Qualité estimée : \(quality.title)"
+        }
+        return "Score indisponible"
+    }
+
+    /// Fiabilité et origine des données : « Fiabilité moyenne », « iPhone seul ».
+    var chips: [String] {
+        guard let session, let report else { return [] }
+        return [report.reliabilityText, Self.sourceText(session)]
+    }
+
+    static func sourceText(_ session: SleepSession) -> String {
+        switch session.primarySource {
+        case .watch:
+            return "Apple Watch + iPhone"
+        case .motion, .microphone:
+            return "iPhone seul"
+        case .manual:
+            if session.state == .manual {
+                return "Saisie manuelle"
+            }
+            return session.recordingMode == .off ? "Micro coupé" : "iPhone seul"
+        }
+    }
+
+    // MARK: - Profil de la nuit
+
+    var showsProfile: Bool {
+        profile?.states.contains { $0 != .unknown } == true
+    }
+
+    /// Plages du profil : ligne 0 éveil probable, 1 agité, 2 calme ; fractions de la nuit.
+    var profileBands: [(start: Double, end: Double, row: Int)] {
+        guard let profile else { return [] }
+        let total = profile.end.timeIntervalSince(profile.start)
+        guard total > 0 else { return [] }
+        return profile.intervals.compactMap { interval in
+            guard let row = Self.profileRow(interval.state) else { return nil }
+            return (
+                start: interval.start.timeIntervalSince(profile.start) / total,
+                end: interval.end.timeIntervalSince(profile.start) / total,
+                row: row
+            )
+        }
+    }
+
+    static func profileRow(_ state: EpochState) -> Int? {
+        switch state {
+        case .awake: 0
+        case .agitated: 1
+        case .calm: 2
+        case .unknown: nil
+        }
+    }
+
+    var profileTicks: [HourTick] {
+        guard let profile else { return [] }
+        return text.format.hourTicks(from: profile.start, to: profile.end)
+    }
+
+    /// Durée de chaque état, dans l'ordre éveil probable, agité, calme.
+    var profileDurations: [(title: String, value: String)] {
+        guard let profile else { return [] }
+        return [EpochState.awake, .agitated, .calm].map { state in
+            (title: state.title, value: text.format.duration(profile.duration(of: state)))
+        }
+    }
+
+    var profileAccessibility: String {
+        "Profil : " + profileDurations.map { "\($0.title.lowercased()) \($0.value)" }.joined(separator: ", ")
+    }
+
+    // MARK: - Comparaison
+
+    var showsComparison: Bool {
+        guard let session, session.kind == .night, let report else { return false }
+        return report.previousNights > 0 && !comparisonRows.isEmpty
+    }
+
+    var comparisonSubtitle: String {
+        let count = report?.previousNights ?? 0
+        return count == 1 ? "Par rapport à ta nuit précédente" : "Par rapport à ta moyenne sur \(count) nuits"
+    }
+
+    /// Durée, coucher et score, comparés à la moyenne des nuits précédentes.
+    var comparisonRows: [ComparisonRow] {
+        guard let session, let report else { return [] }
+        let format = text.format
+        var rows: [ComparisonRow] = []
+        if let asleep = session.asleepDuration, let average = report.averages.asleep, let difference = report.comparison.asleep {
+            rows.append(ComparisonRow(
+                label: "Durée",
+                detail: "\(format.duration(asleep)) · moy. \(format.duration(average))",
+                difference: DifferenceText.duration(difference, format: format)
+            ))
+        }
+        if let bedtime = session.times.bedtime, let average = report.averages.bedtime, let difference = report.comparison.bedtime {
+            rows.append(ComparisonRow(
+                label: "Coucher",
+                detail: "\(format.clock(bedtime)) · moy. \(String(format: "%02d:%02d", average.hour, average.minute))",
+                difference: DifferenceText.duration(difference, format: format)
+            ))
+        }
+        if let score = report.score.total, let average = report.averageScore {
+            rows.append(ComparisonRow(
+                label: "Score",
+                detail: "\(report.score.displayText) · moy. \(Int(average.rounded()))",
+                difference: DifferenceText.points(Double(score) - average)
+            ))
+        }
+        return rows
+    }
+}
+
+/// Une ligne de la comparaison : « Durée · 7 h 51 · moy. 7 h 11 · +40 min ».
+struct ComparisonRow: Identifiable, Hashable {
+    let label: String
+    let detail: String
+    let difference: String
+
+    var id: String { label }
 }
 
 /// Un libellé et sa valeur, pour les grilles de la fiche.

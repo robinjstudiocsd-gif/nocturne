@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SleepAnalysis
 import SleepDomain
 
 /// Ce dont le Journal a besoin : les nuits, leur écoute, les journaux du soir et les cas d'usage.
@@ -12,6 +13,10 @@ public struct JournalDependencies: Sendable {
     public let eraser: any SessionDataEraser
     /// Fabrique le lecteur de la nuit entière.
     public let makeReplayer: @MainActor @Sendable () -> any NightReplaying
+    /// Profil d'une nuit enregistrée (calme, agité, éveil probable).
+    public let profiles: any NightProfileProviding
+    /// Objectifs utilisés par le score.
+    public let goals: @Sendable () -> ScoreGoals
 
     public init(
         sessions: any SleepSessionRepository,
@@ -20,7 +25,9 @@ public struct JournalDependencies: Sendable {
         eveningLogs: any EveningLogRepository,
         lifecycle: SessionLifecycle,
         eraser: any SessionDataEraser,
-        makeReplayer: @escaping @MainActor @Sendable () -> any NightReplaying
+        makeReplayer: @escaping @MainActor @Sendable () -> any NightReplaying,
+        profiles: any NightProfileProviding = NoNightProfiles(),
+        goals: @escaping @Sendable () -> ScoreGoals = { ScoreGoals() }
     ) {
         self.sessions = sessions
         self.recordings = recordings
@@ -29,6 +36,8 @@ public struct JournalDependencies: Sendable {
         self.lifecycle = lifecycle
         self.eraser = eraser
         self.makeReplayer = makeReplayer
+        self.profiles = profiles
+        self.goals = goals
     }
 }
 
