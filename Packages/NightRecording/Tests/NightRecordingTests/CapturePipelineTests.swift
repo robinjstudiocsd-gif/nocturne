@@ -21,8 +21,65 @@ private func tone(format: AVAudioFormat, seconds: Double, amplitude: Float) -> A
     return buffer
 }
 
+/// Classifieur factice : note quand il doit analyser et rend les détections qu'on lui donne.
+private final class FakeClassifier: SoundClassifying, @unchecked Sendable {
+    var activeSeconds: [Bool] = []
+    var pending: [SoundDetection] = []
+    var finished = false
+    var resets = 0
+
+    func process(_ buffer: AVAudioPCMBuffer, framePosition: AVAudioFramePosition, active: Bool) {
+        activeSeconds.append(active)
+    }
+
+    func drain() -> [SoundDetection] {
+        defer { pending = [] }
+        return pending
+    }
+
+    func reset() {
+        resets += 1
+    }
+
+    func finish() {
+        finished = true
+    }
+}
+
 @Suite("Écoute · traitement des blocs")
 struct CapturePipelineTests {
+    @Test("Événements : le classifieur écoute au-dessus du bruit de fond, les détections deviennent des événements")
+    func events() throws {
+        let storage = try temporaryStorage()
+        defer { try? FileManager.default.removeItem(at: storage.root) }
+        let start = Date(timeIntervalSince1970: 1_795_300_000)
+        let fake = FakeClassifier()
+        let pipeline = try CapturePipeline(storage: storage, layout: SegmentLayout(sessionID: UUID(), start: start), mode: .events, quality: .standard) { _, _ in fake }
+        let format = pipeline.processingFormat
+
+        for step in 0..<30 {
+            _ = try pipeline.process(tone(format: format, seconds: 1, amplitude: 0.001), at: start.addingTimeInterval(Double(step)))
+        }
+        let quietActive = fake.activeSeconds.dropFirst(2).filter { $0 }.count
+        #expect(quietActive == 0)
+
+        _ = try pipeline.process(tone(format: format, seconds: 1, amplitude: 0.3), at: start.addingTimeInterval(30))
+        fake.pending = [SoundDetection(time: start.addingTimeInterval(30), kind: .cough, confidence: 0.9, intensity: 0)]
+        let after = try pipeline.process(tone(format: format, seconds: 1, amplitude: 0.001), at: start.addingTimeInterval(31))
+        #expect(fake.activeSeconds.last == true)
+        #expect(after.events.isEmpty)
+
+        _ = pipeline.interrupt()
+        #expect(fake.resets == 1)
+
+        let events = pipeline.closeEvents()
+        #expect(fake.finished)
+        #expect(events.count == 1)
+        #expect(events.first?.kind == .cough)
+        #expect(events.first?.start == start.addingTimeInterval(30))
+        #expect((events.first?.intensity ?? 0) > 20)
+    }
+
     @Test("Mode continu : niveau chaque seconde, tranches, puis fin propre")
     func continuous() throws {
         let storage = try temporaryStorage()

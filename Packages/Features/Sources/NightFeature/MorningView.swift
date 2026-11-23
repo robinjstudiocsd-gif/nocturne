@@ -93,6 +93,11 @@ struct MorningView: View {
                 Text(model.listeningLine)
                     .font(.subheadline)
                     .foregroundStyle(NocturneColor.textSecondary)
+                if let events = model.eventsLine {
+                    Text(events)
+                        .font(.subheadline)
+                        .foregroundStyle(NocturneColor.textSecondary)
+                }
             }
             .accessibilityElement(children: .combine)
             if model.wasInterrupted {

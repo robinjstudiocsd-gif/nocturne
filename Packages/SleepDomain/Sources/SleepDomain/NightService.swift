@@ -18,6 +18,8 @@ public struct NightStatus: Equatable, Sendable {
     public var mode: RecordingMode
     public var segmentCount: Int
     public var recordedBytes: Int64
+    /// Événements sonores repérés depuis le début de la session.
+    public var eventCount: Int
     public var currentLevelDb: Float?
     /// Vrai quand l'écoute est coupée et que la reprise automatique a échoué.
     public var needsResume: Bool
@@ -34,6 +36,7 @@ public struct NightStatus: Equatable, Sendable {
         mode: RecordingMode = .continuous,
         segmentCount: Int = 0,
         recordedBytes: Int64 = 0,
+        eventCount: Int = 0,
         currentLevelDb: Float? = nil,
         needsResume: Bool = false,
         gaps: [RecordingGap] = [],
@@ -46,6 +49,7 @@ public struct NightStatus: Equatable, Sendable {
         self.mode = mode
         self.segmentCount = segmentCount
         self.recordedBytes = recordedBytes
+        self.eventCount = eventCount
         self.currentLevelDb = currentLevelDb
         self.needsResume = needsResume
         self.gaps = gaps

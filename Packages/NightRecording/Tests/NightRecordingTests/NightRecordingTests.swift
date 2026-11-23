@@ -161,13 +161,15 @@ struct SegmentTests {
         let recordings = InMemoryRecordingRepository()
         try await recordings.save(RecordingGap(sessionID: session.id, start: start, end: start.addingTimeInterval(60), cause: .siri))
 
-        try await RecordingEraser(storage: storage, recordings: recordings).eraseRecordings(of: session)
+        let events = InMemoryNightEventRepository([NightEvent(sessionID: session.id, kind: .snoring, start: start, duration: 30, confidence: 0.9, intensity: 12)])
+        try await RecordingEraser(storage: storage, recordings: recordings, events: events).eraseRecordings(of: session)
 
         #expect(!FileManager.default.fileExists(atPath: folder.path))
         #expect(FileManager.default.fileExists(atPath: otherFolder.path))
         #expect(try await recordings.gaps(sessionID: session.id).isEmpty)
+        #expect(try await events.events(sessionID: session.id).isEmpty)
 
-        try await RecordingEraser(storage: storage, recordings: recordings).eraseRecordings(of: other)
+        try await RecordingEraser(storage: storage, recordings: recordings, events: events).eraseRecordings(of: other)
         #expect(!FileManager.default.fileExists(atPath: otherFolder.deletingLastPathComponent().path))
     }
 

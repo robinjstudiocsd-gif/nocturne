@@ -1,19 +1,23 @@
 import Foundation
 import SleepDomain
 
-/// Efface tout ce qu'une nuit a enregistré : tranches audio, niveaux, mouvements, puis leurs fiches dans la base.
+/// Efface tout ce qu'une nuit a enregistré : tranches audio, extraits, niveaux, mouvements,
+/// puis leurs fiches et les événements dans la base.
 public struct RecordingEraser: SessionDataEraser {
     private let storage: RecordingStorage
     private let recordings: any RecordingRepository
+    private let events: any NightEventRepository
 
-    public init(storage: RecordingStorage, recordings: any RecordingRepository) {
+    public init(storage: RecordingStorage, recordings: any RecordingRepository, events: any NightEventRepository) {
         self.storage = storage
         self.recordings = recordings
+        self.events = events
     }
 
     public func eraseRecordings(of session: SleepSession) async throws {
         try storage.removeFolders(sessionID: session.id)
         try await recordings.deleteAll(sessionID: session.id)
+        try await events.deleteAll(sessionID: session.id)
     }
 }
 

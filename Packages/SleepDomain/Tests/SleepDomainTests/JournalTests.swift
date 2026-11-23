@@ -201,3 +201,22 @@ struct NightDetailTests {
         #expect(try await recordings.gaps(sessionID: session.id).isEmpty)
     }
 }
+
+@Suite("Événements de la nuit")
+struct NightEventTests {
+    @Test("Correction : le type d'origine reste connu ; confiance affichée")
+    func reclassify() {
+        let event = NightEvent(sessionID: UUID(), kind: .snoring, start: date(22, 3, 12), duration: 130, confidence: 0.92, intensity: 14)
+
+        let corrected = event.reclassified(as: .breathing)
+        #expect(corrected.kind == .breathing)
+        #expect(corrected.detectedKind == .snoring)
+        #expect(corrected.origin == .reclassified)
+        #expect(corrected.reclassified(as: .snoring).origin == .confirmed)
+        #expect(event.confidenceLevel == .high)
+        #expect(ConfidenceLevel(0.6).title == "moyenne")
+        #expect(ConfidenceLevel(0.2) == .low)
+        #expect(event.end == date(22, 3, 14).addingTimeInterval(10))
+        #expect(EventKind.snoring.mergeGap == 30)
+    }
+}

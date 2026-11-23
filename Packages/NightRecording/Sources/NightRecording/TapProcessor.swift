@@ -40,7 +40,7 @@ final class TapProcessor: @unchecked Sendable {
         guard status != .error, converted.frameLength > 0 else { return }
         do {
             let output = try pipeline.process(converted, at: Date())
-            if !output.levels.isEmpty || !output.finishedSegments.isEmpty {
+            if !output.levels.isEmpty || !output.finishedSegments.isEmpty || !output.events.isEmpty {
                 deliver(output)
             }
         } catch {

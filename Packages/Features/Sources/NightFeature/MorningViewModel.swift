@@ -114,6 +114,16 @@ public final class MorningViewModel {
         return "\(listened) d’écoute · \(gaps.count) coupure\(gaps.count > 1 ? "s" : "") (\(format.duration(missing)))"
     }
 
+    /// « 17 événements sonores »
+    public var eventsLine: String? {
+        guard snapshot.mode != .off else { return nil }
+        switch snapshot.eventCount {
+        case 0: return "Aucun événement sonore"
+        case 1: return "1 événement sonore"
+        default: return "\(snapshot.eventCount) événements sonores"
+        }
+    }
+
     /// Vrai si l'app s'est arrêtée pendant la nuit et que la fin a été estimée.
     public var wasInterrupted: Bool {
         session.state == .interrupted

@@ -9,7 +9,7 @@ public enum SchemaV1: VersionedSchema {
     public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
     public static var models: [any PersistentModel.Type] {
-        [SleepSessionRecord.self, EveningLogRecord.self, AudioSegmentRecord.self, RecordingGapRecord.self]
+        [SleepSessionRecord.self, EveningLogRecord.self, AudioSegmentRecord.self, RecordingGapRecord.self, NightEventRecord.self]
     }
 
     /// Une nuit ou une sieste, telle qu'elle est rangée dans la base.
@@ -134,9 +134,40 @@ public enum SchemaV1: VersionedSchema {
             causeRaw = gap.cause.rawValue
         }
     }
+
+    /// Un événement de la nuit : ronflement, toux, paroles, bruit extérieur…
+    @Model
+    public final class NightEventRecord {
+        @Attribute(.unique) public var id: UUID
+        public var sessionID: UUID
+        public var kindRaw: String
+        public var detectedKindRaw: String
+        public var start: Date
+        public var duration: Double
+        public var confidence: Double
+        public var intensity: Double
+        public var originRaw: String
+        public var isSomeoneElse: Bool
+        public var clipPath: String?
+
+        public init(event: NightEvent) {
+            id = event.id
+            sessionID = event.sessionID
+            kindRaw = event.kind.rawValue
+            detectedKindRaw = event.detectedKind.rawValue
+            start = event.start
+            duration = event.duration
+            confidence = event.confidence
+            intensity = event.intensity
+            originRaw = event.origin.rawValue
+            isSomeoneElse = event.isSomeoneElse
+            clipPath = event.clipPath
+        }
+    }
 }
 
 public typealias SleepSessionRecord = SchemaV1.SleepSessionRecord
+public typealias NightEventRecord = SchemaV1.NightEventRecord
 public typealias EveningLogRecord = SchemaV1.EveningLogRecord
 public typealias AudioSegmentRecord = SchemaV1.AudioSegmentRecord
 public typealias RecordingGapRecord = SchemaV1.RecordingGapRecord
@@ -267,5 +298,36 @@ extension SchemaV1.RecordingGapRecord {
         start = gap.start
         end = gap.end
         causeRaw = gap.cause.rawValue
+    }
+}
+
+extension SchemaV1.NightEventRecord {
+    var event: NightEvent {
+        NightEvent(
+            id: id,
+            sessionID: sessionID,
+            kind: EventKind(rawValue: kindRaw) ?? .unusual,
+            detectedKind: EventKind(rawValue: detectedKindRaw) ?? .unusual,
+            start: start,
+            duration: duration,
+            confidence: confidence,
+            intensity: intensity,
+            origin: EventOrigin(rawValue: originRaw) ?? .detected,
+            isSomeoneElse: isSomeoneElse,
+            clipPath: clipPath
+        )
+    }
+
+    func apply(_ event: NightEvent) {
+        sessionID = event.sessionID
+        kindRaw = event.kind.rawValue
+        detectedKindRaw = event.detectedKind.rawValue
+        start = event.start
+        duration = event.duration
+        confidence = event.confidence
+        intensity = event.intensity
+        originRaw = event.origin.rawValue
+        isSomeoneElse = event.isSomeoneElse
+        clipPath = event.clipPath
     }
 }

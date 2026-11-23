@@ -10,6 +10,7 @@ import UIKit
 public final class NightSessionController: NightRecordingService {
     private let lifecycle: SessionLifecycle
     private let recordings: any RecordingRepository
+    private let events: any NightEventRepository
     private let storage: RecordingStorage
     private let journal: any DiagnosticJournal
     private let quality: AudioQuality
@@ -35,12 +36,14 @@ public final class NightSessionController: NightRecordingService {
     public init(
         lifecycle: SessionLifecycle,
         recordings: any RecordingRepository,
+        events: any NightEventRepository,
         storage: RecordingStorage,
         journal: any DiagnosticJournal,
         quality: AudioQuality = .standard
     ) {
         self.lifecycle = lifecycle
         self.recordings = recordings
+        self.events = events
         self.storage = storage
         self.journal = journal
         self.quality = quality
@@ -79,6 +82,10 @@ public final class NightSessionController: NightRecordingService {
     public func stop() async throws -> SleepSession? {
         guard let session = try await lifecycle.running() else { return nil }
         stopListening()
+        if let remaining = pipeline?.closeEvents(), !remaining.isEmpty {
+            try? await events.save(remaining)
+            status.eventCount += remaining.count
+        }
         if let last = pipeline?.finish() {
             try? await recordings.save(last)
         }
@@ -87,13 +94,14 @@ public final class NightSessionController: NightRecordingService {
         liveActivity.end()
         checkpoints.clear()
         let finished = try await lifecycle.stop(id: session.id)
-        journal.record("Nuit arrêtée · \(status.segmentCount) tranches · batterie \(NightSessionController.batteryText())")
+        journal.record("Nuit arrêtée · \(status.segmentCount) tranches · \(status.eventCount) événements · batterie \(NightSessionController.batteryText())")
         alarm = nil
         status = NightStatus(
             session: finished,
             mode: status.mode,
             segmentCount: status.segmentCount,
             recordedBytes: status.recordedBytes,
+            eventCount: status.eventCount,
             gaps: status.gaps
         )
         return finished
@@ -187,7 +195,9 @@ public final class NightSessionController: NightRecordingService {
         try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers])
         try audio.setActive(true)
         let layout = SegmentLayout(sessionID: session.id, start: session.times.bedtime ?? session.createdAt)
-        let pipeline = try CapturePipeline(storage: storage, layout: layout, mode: mode, quality: quality, resume: resume)
+        let pipeline = try CapturePipeline(storage: storage, layout: layout, mode: mode, quality: quality, resume: resume) { format, start in
+            SoundClassifier(format: format, start: start)
+        }
         try installTap(pipeline: pipeline)
         self.pipeline = pipeline
         if motion == nil {
@@ -253,6 +263,10 @@ public final class NightSessionController: NightRecordingService {
             try? await recordings.save(segment)
             status.segmentCount += 1
             status.recordedBytes += segment.byteSize
+        }
+        if !output.events.isEmpty {
+            try? await events.save(output.events)
+            status.eventCount += output.events.count
         }
     }
 

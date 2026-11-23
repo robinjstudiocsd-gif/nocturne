@@ -120,16 +120,19 @@ public protocol SessionDataEraser: Sendable {
     func eraseRecordings(of session: SleepSession) async throws
 }
 
-/// Version qui n'efface que les tranches et les trous du dépôt, pour les tests et les aperçus.
+/// Version qui n'efface que les fiches de la base (tranches, trous, événements), pour les tests et les aperçus.
 public struct RepositoryDataEraser: SessionDataEraser {
     private let recordings: any RecordingRepository
+    private let events: (any NightEventRepository)?
 
-    public init(recordings: any RecordingRepository) {
+    public init(recordings: any RecordingRepository, events: (any NightEventRepository)? = nil) {
         self.recordings = recordings
+        self.events = events
     }
 
     public func eraseRecordings(of session: SleepSession) async throws {
         try await recordings.deleteAll(sessionID: session.id)
+        try await events?.deleteAll(sessionID: session.id)
     }
 }
 

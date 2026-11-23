@@ -18,6 +18,7 @@ final class AppContainer {
     let sessions: any SleepSessionRepository
     let recordings: any RecordingRepository
     let eveningLogs: any EveningLogRepository
+    let events: any NightEventRepository
     let lifecycle: SessionLifecycle
     let night: NightSessionController
     let journal: any DiagnosticJournal
@@ -30,20 +31,22 @@ final class AppContainer {
     init(modelContainer: ModelContainer, journal: any DiagnosticJournal, defaults: UserDefaults, bundleURL: URL, storage: RecordingStorage) {
         let sessions = SwiftDataSleepSessionRepository(container: modelContainer)
         let recordings = SwiftDataRecordingRepository(container: modelContainer)
+        let events = SwiftDataNightEventRepository(container: modelContainer)
         let lifecycle = SessionLifecycle(repository: sessions)
         let signing = SigningStatus.read(bundleURL: bundleURL)
         self.modelContainer = modelContainer
         self.sessions = sessions
         self.recordings = recordings
         self.eveningLogs = SwiftDataEveningLogRepository(container: modelContainer)
+        self.events = events
         self.lifecycle = lifecycle
-        self.night = NightSessionController(lifecycle: lifecycle, recordings: recordings, storage: storage, journal: journal, quality: AppContainer.audioQuality)
+        self.night = NightSessionController(lifecycle: lifecycle, recordings: recordings, events: events, storage: storage, journal: journal, quality: AppContainer.audioQuality)
         self.journal = journal
         self.preferences = AppPreferences(defaults: defaults)
         self.signing = signing
         self.renewals = RenewalTracker(defaults: defaults)
         self.preflight = DevicePreflight(storage: storage, signatureExpiry: signing.expirationDate)
-        self.eraser = RecordingEraser(storage: storage, recordings: recordings)
+        self.eraser = RecordingEraser(storage: storage, recordings: recordings, events: events)
     }
 
     /// Modèle de vue du Journal : liste, fiches, modifications et ajouts.
