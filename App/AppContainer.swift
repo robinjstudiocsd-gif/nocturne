@@ -1,5 +1,6 @@
 import AppSettings
 import Foundation
+import JournalFeature
 import NightFeature
 import NightRecording
 import Persistence
@@ -24,6 +25,7 @@ final class AppContainer {
     let signing: SigningStatus
     let renewals: RenewalTracker
     let preflight: DevicePreflight
+    let eraser: RecordingEraser
 
     init(modelContainer: ModelContainer, journal: any DiagnosticJournal, defaults: UserDefaults, bundleURL: URL, storage: RecordingStorage) {
         let sessions = SwiftDataSleepSessionRepository(container: modelContainer)
@@ -41,6 +43,18 @@ final class AppContainer {
         self.signing = signing
         self.renewals = RenewalTracker(defaults: defaults)
         self.preflight = DevicePreflight(storage: storage, signatureExpiry: signing.expirationDate)
+        self.eraser = RecordingEraser(storage: storage, recordings: recordings)
+    }
+
+    /// Modèle de vue du Journal : liste, fiches, modifications et ajouts.
+    func makeJournalModel() -> JournalViewModel {
+        JournalViewModel(dependencies: JournalDependencies(
+            sessions: sessions,
+            recordings: recordings,
+            eveningLogs: eveningLogs,
+            lifecycle: lifecycle,
+            eraser: eraser
+        ))
     }
 
     /// Modèle de vue de l'onglet Nuit, partagé par l'écran de préparation et l'écran de nuit.

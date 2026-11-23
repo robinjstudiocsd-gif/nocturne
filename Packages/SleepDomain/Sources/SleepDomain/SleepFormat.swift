@@ -30,6 +30,13 @@ public struct SleepFormat: Sendable {
         return String(format: "%d h %02d", hours, rest)
     }
 
+    /// « 7h51 », « 45 min » : pour les petites cases du calendrier.
+    public func shortDuration(_ interval: TimeInterval) -> String {
+        let minutes = max(0, Int((interval / 60).rounded()))
+        guard minutes >= 60 else { return "\(minutes) min" }
+        return String(format: "%dh%02d", minutes / 60, minutes % 60)
+    }
+
     /// « lundi 23 novembre »
     public func longDay(_ date: Date) -> String {
         formatter("EEEE d MMMM").string(from: date)
@@ -49,6 +56,16 @@ public struct SleepFormat: Sendable {
     /// « jeu. 26 »
     public func weekdayAndDay(_ date: Date) -> String {
         formatter("EEE d").string(from: date)
+    }
+
+    /// « samedi 21 »
+    public func weekdayDay(_ date: Date) -> String {
+        formatter("EEEE d").string(from: date)
+    }
+
+    /// « novembre 2026 »
+    public func monthYear(_ date: Date) -> String {
+        formatter("LLLL yyyy").string(from: date)
     }
 
     /// « 41 Go », « 4,2 Go », « 820 Mo », comme dans les réglages de l'iPhone.

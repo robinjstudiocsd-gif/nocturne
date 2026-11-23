@@ -109,8 +109,28 @@ public protocol RecordingRepository: Sendable {
     func segments(sessionID: UUID) async throws -> [AudioSegment]
     func save(_ segment: AudioSegment) async throws
     func gaps(sessionID: UUID) async throws -> [RecordingGap]
+    /// Tous les trous, de toutes les sessions, pour la liste du journal.
+    func allGaps() async throws -> [RecordingGap]
     func save(_ gap: RecordingGap) async throws
     func deleteAll(sessionID: UUID) async throws
+}
+
+/// Efface ce qui a été enregistré pendant une session : audio, niveaux, mouvements, trous.
+public protocol SessionDataEraser: Sendable {
+    func eraseRecordings(of session: SleepSession) async throws
+}
+
+/// Version qui n'efface que les tranches et les trous du dépôt, pour les tests et les aperçus.
+public struct RepositoryDataEraser: SessionDataEraser {
+    private let recordings: any RecordingRepository
+
+    public init(recordings: any RecordingRepository) {
+        self.recordings = recordings
+    }
+
+    public func eraseRecordings(of session: SleepSession) async throws {
+        try await recordings.deleteAll(sessionID: session.id)
+    }
 }
 
 /// Version factice, pour les tests et les aperçus.
@@ -130,6 +150,10 @@ public actor InMemoryRecordingRepository: RecordingRepository {
 
     public func gaps(sessionID: UUID) async throws -> [RecordingGap] {
         gapStore.values.filter { $0.sessionID == sessionID }.sorted { $0.start < $1.start }
+    }
+
+    public func allGaps() async throws -> [RecordingGap] {
+        gapStore.values.sorted { $0.start < $1.start }
     }
 
     public func save(_ gap: RecordingGap) async throws {

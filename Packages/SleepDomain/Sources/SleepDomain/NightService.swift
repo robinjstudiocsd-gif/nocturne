@@ -62,14 +62,8 @@ public struct NightStatus: Equatable, Sendable {
 
     /// Temps réellement écouté : du début de la session à `now` (ou à son arrêt), moins les trous et la coupure en cours.
     public func listenedDuration(until now: Date) -> TimeInterval {
-        guard mode != .off, let session, let start = session.detected.bedtime else { return 0 }
-        let end = session.state == .running ? now : (session.detected.wake ?? now)
-        guard end > start else { return 0 }
-        let missing = gaps.reduce(0) { total, gap in
-            total + max(0, min(gap.end, end).timeIntervalSince(max(gap.start, start)))
-        }
-        let ongoing = cut.map { max(0, end.timeIntervalSince(max($0.start, start))) } ?? 0
-        return max(0, end.timeIntervalSince(start) - missing - ongoing)
+        guard mode != .off, let session else { return 0 }
+        return session.listenedDuration(gaps: gaps, cut: cut, until: now)
     }
 }
 

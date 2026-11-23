@@ -41,6 +41,10 @@ public final class SwiftDataRecordingRepository: RecordingRepository {
         return try context.fetch(descriptor).map(\.gap)
     }
 
+    public func allGaps() async throws -> [RecordingGap] {
+        try context.fetch(FetchDescriptor<RecordingGapRecord>(sortBy: [SortDescriptor(\.start)])).map(\.gap)
+    }
+
     public func save(_ gap: RecordingGap) async throws {
         let id = gap.id
         var descriptor = FetchDescriptor<RecordingGapRecord>(predicate: #Predicate<RecordingGapRecord> { $0.id == id })

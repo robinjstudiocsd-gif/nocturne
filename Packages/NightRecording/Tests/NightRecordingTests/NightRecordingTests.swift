@@ -147,6 +147,30 @@ struct SegmentTests {
         #expect(reread.nextSegmentIndex == 3)
     }
 
+    @Test("Suppression d'une nuit : dossier, dossier du jour vide et fiches effacés")
+    func eraseNight() async throws {
+        let root = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = RecordingStorage(root: root)
+        let start = Date(timeIntervalSince1970: 1_795_300_000)
+        let session = SleepSession(state: .finished, detected: SessionTimes(bedtime: start, wake: start.addingTimeInterval(3_600)))
+        let other = SleepSession(state: .finished, detected: SessionTimes(bedtime: start, wake: start.addingTimeInterval(3_600)))
+        let folder = try storage.prepareFolder(for: SegmentLayout(sessionID: session.id, start: start))
+        let otherFolder = try storage.prepareFolder(for: SegmentLayout(sessionID: other.id, start: start))
+        try Data([1, 2, 3]).write(to: folder.appendingPathComponent("tranche-001.m4a"))
+        let recordings = InMemoryRecordingRepository()
+        try await recordings.save(RecordingGap(sessionID: session.id, start: start, end: start.addingTimeInterval(60), cause: .siri))
+
+        try await RecordingEraser(storage: storage, recordings: recordings).eraseRecordings(of: session)
+
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
+        #expect(FileManager.default.fileExists(atPath: otherFolder.path))
+        #expect(try await recordings.gaps(sessionID: session.id).isEmpty)
+
+        try await RecordingEraser(storage: storage, recordings: recordings).eraseRecordings(of: other)
+        #expect(!FileManager.default.fileExists(atPath: otherFolder.deletingLastPathComponent().path))
+    }
+
     @Test("Reprise : trou noté depuis le dernier battement, nuit trop ancienne terminée")
     func recovery() {
         let start = Date(timeIntervalSince1970: 1_795_300_000)

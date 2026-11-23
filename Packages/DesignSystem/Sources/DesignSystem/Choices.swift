@@ -1,14 +1,21 @@
 import SwiftUI
 
-/// Sélecteur à segments (« Nuit | Sieste »).
+/// Sélecteur à segments (« Nuit | Sieste »), en taille normale ou compacte (filtres).
 public struct SegmentedControl<Value: Hashable>: View {
+    public enum Size: Sendable {
+        case regular
+        case compact
+    }
+
     private let options: [Value]
     private let label: (Value) -> String
+    private let size: Size
     @Binding private var selection: Value
 
-    public init(_ options: [Value], selection: Binding<Value>, label: @escaping (Value) -> String) {
+    public init(_ options: [Value], selection: Binding<Value>, size: Size = .regular, label: @escaping (Value) -> String) {
         self.options = options
         self.label = label
+        self.size = size
         _selection = selection
     }
 
@@ -20,10 +27,10 @@ public struct SegmentedControl<Value: Hashable>: View {
                     selection = option
                 } label: {
                     Text(label(option))
-                        .font(.subheadline.weight(.semibold))
+                        .font(size == .regular ? .subheadline.weight(.semibold) : .footnote.weight(.semibold))
                         .foregroundStyle(isSelected ? NocturneColor.textPrimary : NocturneColor.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 40)
-                        .background(isSelected ? NocturneColor.segmentSelected : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .frame(maxWidth: .infinity, minHeight: size == .regular ? 40 : 32)
+                        .background(isSelected ? NocturneColor.segmentSelected : Color.clear, in: RoundedRectangle(cornerRadius: size == .regular ? 10 : 8, style: .continuous))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -31,7 +38,7 @@ public struct SegmentedControl<Value: Hashable>: View {
             }
         }
         .padding(2)
-        .background(NocturneColor.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(NocturneColor.card, in: RoundedRectangle(cornerRadius: size == .regular ? 12 : 10, style: .continuous))
     }
 }
 

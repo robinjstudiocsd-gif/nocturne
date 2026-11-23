@@ -28,6 +28,12 @@ public enum NocturneColor {
     public static let placeholder = Color(hex: 0x8E97C4)
     /// Chevron des lignes qui ouvrent un écran.
     public static let chevron = Color(hex: 0x6F7AB0)
+    /// Jours hors du mois ou à venir, dans le calendrier.
+    public static let textFaint = Color(hex: 0x5C6699)
+    /// Icônes des boutons ronds.
+    public static let iconSoft = Color(hex: 0xC9CEEA)
+    /// Actions qui suppriment.
+    public static let destructive = Color(hex: 0xFF8A80)
 
     // Accents
     public static let violet = Color(hex: 0x6E5BD6)

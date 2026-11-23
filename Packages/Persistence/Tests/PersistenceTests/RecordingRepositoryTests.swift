@@ -27,8 +27,11 @@ struct RecordingRepositoryTests {
         #expect(segments.last?.state == .truncated)
 
         let gap = RecordingGap(sessionID: night, start: start.addingTimeInterval(420), end: start.addingTimeInterval(1_140), cause: .phoneCall)
+        let earlier = RecordingGap(sessionID: other, start: start.addingTimeInterval(60), end: start.addingTimeInterval(90), cause: .siri)
         try await repository.save(gap)
+        try await repository.save(earlier)
         #expect(try await repository.gaps(sessionID: night) == [gap])
+        #expect(try await repository.allGaps() == [earlier, gap])
 
         try await repository.deleteAll(sessionID: night)
         #expect(try await repository.segments(sessionID: night).isEmpty)

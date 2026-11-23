@@ -26,7 +26,7 @@ struct RootView: View {
 
     init(container: AppContainer) {
         self.container = container
-        _journalModel = State(initialValue: JournalViewModel(repository: container.sessions))
+        _journalModel = State(initialValue: container.makeJournalModel())
         _nightModel = State(initialValue: container.makeNightModel())
     }
 

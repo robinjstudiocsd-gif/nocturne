@@ -4,6 +4,7 @@ import Foundation
 public enum SessionError: Error, Equatable, Sendable {
     case notFound
     case notRunning
+    case stillRunning
     case invalidTimes([SessionIssue])
 }
 
@@ -14,6 +15,8 @@ extension SessionError: LocalizedError {
             return "Cette nuit n’existe plus."
         case .notRunning:
             return "Cette nuit est déjà terminée."
+        case .stillRunning:
+            return "Cette nuit est en cours : arrête-la avant de la supprimer."
         case .invalidTimes(let issues):
             if issues.contains(.timesOutOfOrder) {
                 return "Les horaires doivent se suivre : coucher, endormissement, réveil, puis lever."
@@ -112,6 +115,36 @@ public struct SessionLifecycle: Sendable {
         guard issues.isEmpty else { throw SessionError.invalidTimes(issues) }
         try await repository.save(session)
         return session
+    }
+
+    /// Écran « Modifier une nuit » : horaires corrigés, réveils, type, ressenti et commentaire, après vérification.
+    @discardableResult
+    public func saveEdit(
+        id: UUID,
+        corrected: SessionTimes,
+        wakeEpisodes: [WakeEpisode],
+        kind: SessionKind,
+        feeling: WakeFeeling?,
+        comment: String?
+    ) async throws -> SleepSession {
+        guard var session = try await repository.session(id: id) else { throw SessionError.notFound }
+        session.corrected = corrected
+        session.wakeEpisodes = wakeEpisodes.sorted { $0.start < $1.start }
+        session.kind = kind
+        session.feeling = feeling?.isEmpty == false ? feeling : nil
+        session.comment = comment?.trimmedOrNil
+        let issues = session.issues
+        guard issues.isEmpty else { throw SessionError.invalidTimes(issues) }
+        try await repository.save(session)
+        return session
+    }
+
+    /// Supprime une session et tout ce qui a été enregistré pendant elle. Une session en cours ne se supprime pas.
+    public func delete(id: UUID, erasing eraser: any SessionDataEraser) async throws {
+        guard let session = try await repository.session(id: id) else { throw SessionError.notFound }
+        guard session.state != .running else { throw SessionError.stillRunning }
+        try await eraser.eraseRecordings(of: session)
+        try await repository.delete(id: id)
     }
 
     /// Écran « Bonjour » : ressenti, horaires corrigés et commentaire, enregistrés ensemble après vérification.
