@@ -22,6 +22,15 @@ public struct RecordingEraser: SessionDataEraser {
 }
 
 extension RecordingStorage {
+    /// Dossier d'une nuit, quel que soit le jour sous lequel il est rangé.
+    public func folder(sessionID: UUID) -> URL? {
+        let recordings = root.appendingPathComponent("Recordings", isDirectory: true)
+        let days = (try? FileManager.default.contentsOfDirectory(at: recordings, includingPropertiesForKeys: nil)) ?? []
+        return days
+            .map { $0.appendingPathComponent(sessionID.uuidString, isDirectory: true) }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
     /// Supprime le dossier d'une nuit, quel que soit le jour sous lequel il est rangé,
     /// puis le dossier du jour s'il est devenu vide.
     public func removeFolders(sessionID: UUID) throws {

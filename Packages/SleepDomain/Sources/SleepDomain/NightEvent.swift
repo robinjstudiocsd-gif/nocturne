@@ -104,6 +104,8 @@ public struct NightEvent: Identifiable, Hashable, Codable, Sendable {
     public var origin: EventOrigin
     /// Vrai si l'utilisateur a indiqué « ce n'est pas moi ».
     public var isSomeoneElse: Bool
+    /// Favori : le passage est protégé du nettoyage automatique.
+    public var isFavorite: Bool
     /// Extrait audio gardé autour de l'événement, s'il y en a un.
     public var clipPath: String?
 
@@ -118,6 +120,7 @@ public struct NightEvent: Identifiable, Hashable, Codable, Sendable {
         intensity: Double,
         origin: EventOrigin = .detected,
         isSomeoneElse: Bool = false,
+        isFavorite: Bool = false,
         clipPath: String? = nil
     ) {
         self.id = id
@@ -130,6 +133,7 @@ public struct NightEvent: Identifiable, Hashable, Codable, Sendable {
         self.intensity = intensity
         self.origin = origin
         self.isSomeoneElse = isSomeoneElse
+        self.isFavorite = isFavorite
         self.clipPath = clipPath
     }
 

@@ -42,6 +42,9 @@ public struct JournalView: View {
                     await model.load()
                 }
             }
+            .navigationDestination(for: ReplayRoute.self) { route in
+                ReplayView(session: route.session, dependencies: model.dependencies)
+            }
             .sheet(isPresented: $showsAdd) {
                 AddNightView(model: model.makeAddNight()) {
                     Task { await model.load() }

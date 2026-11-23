@@ -220,3 +220,38 @@ struct NightEventTests {
         #expect(EventKind.snoring.mergeGap == 30)
     }
 }
+
+@Suite("Réécoute de la nuit")
+struct TimelineTests {
+    @Test("Colonnes, bruit de fond et passages calmes")
+    func builder() {
+        let levels: [Float?] = [-60, -58, nil, -20, -61, -59]
+        #expect(TimelineBuilder.columns(levels, count: 3) == [-58, -20, -59])
+        #expect(TimelineBuilder.floor([-60, -50, -40, -30, -20]) == -50)
+
+        var peaks = [Float?](repeating: -60, count: 40)
+        peaks[20] = -30
+        #expect(TimelineBuilder.quietRanges(peaks: peaks, floor: -60) == [2...18, 23...38])
+        #expect(TimelineBuilder.quietRanges(peaks: peaks, floor: -60, busy: [25...30]) == [2...18])
+    }
+
+    @Test("Saut d'un événement à l'autre et des silences")
+    func navigation() {
+        let start = Date(timeIntervalSince1970: 1_795_300_000)
+        let snore = NightEvent(sessionID: UUID(), kind: .snoring, start: start.addingTimeInterval(100), duration: 60, confidence: 0.9, intensity: 10)
+        let speech = NightEvent(sessionID: UUID(), kind: .speech, start: start.addingTimeInterval(400), duration: 5, confidence: 0.6, intensity: 8)
+        let timeline = NightTimeline(start: start, duration: 1_000, events: [speech, snore], quietRanges: [200...380])
+
+        #expect(timeline.events.map(\.kind) == [.snoring, .speech])
+        #expect(timeline.event(at: 130)?.kind == .snoring)
+        #expect(timeline.event(at: 300) == nil)
+        #expect(timeline.nextEvent(after: 50)?.kind == .snoring)
+        #expect(timeline.nextEvent(after: 100)?.kind == .speech)
+        #expect(timeline.previousEvent(before: 402)?.kind == .snoring)
+        #expect(timeline.previousEvent(before: 410)?.kind == .speech)
+        #expect(timeline.nextEvent(after: 0, kinds: [.speech])?.kind == .speech)
+        #expect(timeline.skippingQuiet(250) == 380)
+        #expect(timeline.skippingQuiet(150) == 150)
+        #expect(timeline.date(at: 60) == start.addingTimeInterval(60))
+    }
+}

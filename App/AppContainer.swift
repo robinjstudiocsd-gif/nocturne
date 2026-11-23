@@ -27,6 +27,7 @@ final class AppContainer {
     let renewals: RenewalTracker
     let preflight: DevicePreflight
     let eraser: RecordingEraser
+    let storage: RecordingStorage
 
     init(modelContainer: ModelContainer, journal: any DiagnosticJournal, defaults: UserDefaults, bundleURL: URL, storage: RecordingStorage) {
         let sessions = SwiftDataSleepSessionRepository(container: modelContainer)
@@ -47,16 +48,22 @@ final class AppContainer {
         self.renewals = RenewalTracker(defaults: defaults)
         self.preflight = DevicePreflight(storage: storage, signatureExpiry: signing.expirationDate)
         self.eraser = RecordingEraser(storage: storage, recordings: recordings, events: events)
+        self.storage = storage
     }
 
     /// Modèle de vue du Journal : liste, fiches, modifications et ajouts.
     func makeJournalModel() -> JournalViewModel {
-        JournalViewModel(dependencies: JournalDependencies(
+        let storage = storage
+        let recordings = recordings
+        let events = events
+        return JournalViewModel(dependencies: JournalDependencies(
             sessions: sessions,
             recordings: recordings,
+            events: events,
             eveningLogs: eveningLogs,
             lifecycle: lifecycle,
-            eraser: eraser
+            eraser: eraser,
+            makeReplayer: { NightReplayer(storage: storage, recordings: recordings, events: events) }
         ))
     }
 

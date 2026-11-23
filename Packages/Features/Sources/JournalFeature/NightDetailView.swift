@@ -162,7 +162,41 @@ struct NightDetailView: View {
                     }
                 }
             }
-            // Lot 3 : niveau sonore de la nuit, événements, extraits et « Réécouter la nuit ».
+            if !model.eventSummary.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(model.eventSummary) { item in
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(NocturneColor.amber)
+                                .frame(width: 10, height: 10)
+                                .accessibilityHidden(true)
+                            Text(item.label)
+                                .font(.subheadline)
+                                .foregroundStyle(NocturneColor.textPrimary)
+                            Spacer()
+                            Text(item.value)
+                                .font(.subheadline)
+                                .monospacedDigit()
+                                .foregroundStyle(NocturneColor.textSecondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            } else if model.session?.recordingMode != .off {
+                Text("Aucun événement sonore repéré.")
+                    .font(.subheadline)
+                    .foregroundStyle(NocturneColor.textSecondary)
+            }
+            if model.canReplay, let session = model.session {
+                NavigationLink(value: ReplayRoute(session: session)) {
+                    Label("Réécouter la nuit", systemImage: "play.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(NocturneColor.violet, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

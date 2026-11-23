@@ -10,6 +10,7 @@ final class NightDetailViewModel {
     private(set) var session: SleepSession? = nil
     private(set) var gaps: [RecordingGap] = []
     private(set) var recordedBytes: Int64 = 0
+    private(set) var events: [NightEvent] = []
     private(set) var eveningLog: EveningLog? = nil
     private(set) var olderID: UUID? = nil
     private(set) var newerID: UUID? = nil
@@ -41,6 +42,7 @@ final class NightDetailViewModel {
             let current = all[index]
             let loadedGaps = try await dependencies.recordings.gaps(sessionID: current.id)
             let segments = try await dependencies.recordings.segments(sessionID: current.id)
+            let loadedEvents = try await dependencies.events.events(sessionID: current.id)
             var log: EveningLog? = nil
             if current.kind == .night {
                 log = try await dependencies.eveningLogs.log(forDay: text.nightCalendar.evening(of: current))
@@ -50,6 +52,7 @@ final class NightDetailViewModel {
             olderID = index + 1 < all.count ? all[index + 1].id : nil
             gaps = loadedGaps
             recordedBytes = segments.reduce(0) { $0 + $1.byteSize }
+            events = loadedEvents
             eveningLog = log
             isMissing = false
             errorMessage = nil
@@ -130,6 +133,23 @@ final class NightDetailViewModel {
 
     var gapLines: [String] {
         gaps.map(text.gap)
+    }
+
+    /// « Ronflements · 6 · 18 min », par type, dans l'ordre des types.
+    var eventSummary: [LabeledValue] {
+        let mine = events.filter { !$0.isSomeoneElse }
+        return EventKind.allCases.compactMap { kind in
+            let ofKind = mine.filter { $0.kind == kind }
+            guard !ofKind.isEmpty else { return nil }
+            let total = ofKind.reduce(0) { $0 + $1.duration }
+            return LabeledValue(label: kind.pluralTitle, value: "\(ofKind.count) · \(ReplayText.duration(total))")
+        }
+    }
+
+    /// La réécoute n'a de sens qu'une fois la nuit terminée, avec du son gardé.
+    var canReplay: Bool {
+        guard let session, session.state != .running else { return false }
+        return recordedBytes > 0 || !events.isEmpty
     }
 
     /// Ressenti et journal du soir, seulement ce qui est renseigné.

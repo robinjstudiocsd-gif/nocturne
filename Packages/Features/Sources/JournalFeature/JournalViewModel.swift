@@ -6,22 +6,38 @@ import SleepDomain
 public struct JournalDependencies: Sendable {
     public let sessions: any SleepSessionRepository
     public let recordings: any RecordingRepository
+    public let events: any NightEventRepository
     public let eveningLogs: any EveningLogRepository
     public let lifecycle: SessionLifecycle
     public let eraser: any SessionDataEraser
+    /// Fabrique le lecteur de la nuit entière.
+    public let makeReplayer: @MainActor @Sendable () -> any NightReplaying
 
     public init(
         sessions: any SleepSessionRepository,
         recordings: any RecordingRepository,
+        events: any NightEventRepository,
         eveningLogs: any EveningLogRepository,
         lifecycle: SessionLifecycle,
-        eraser: any SessionDataEraser
+        eraser: any SessionDataEraser,
+        makeReplayer: @escaping @MainActor @Sendable () -> any NightReplaying
     ) {
         self.sessions = sessions
         self.recordings = recordings
+        self.events = events
         self.eveningLogs = eveningLogs
         self.lifecycle = lifecycle
         self.eraser = eraser
+        self.makeReplayer = makeReplayer
+    }
+}
+
+/// Ouvre la réécoute d'une nuit.
+public struct ReplayRoute: Hashable, Sendable {
+    public let session: SleepSession
+
+    public init(session: SleepSession) {
+        self.session = session
     }
 }
 
