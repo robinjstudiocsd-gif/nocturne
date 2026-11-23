@@ -16,8 +16,10 @@ concurrency:
 jobs:
   ipa:
     name: Tests et app à installer (.ipa)
-    runs-on: macos-26
-    timeout-minutes: 45
+    # Mac Intel de GitHub (macOS 26, même Xcode) : les Mac Apple Silicon sont saturés.
+    # Gratuit pour un dépôt public.
+    runs-on: macos-26-intel
+    timeout-minutes: 60
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
